@@ -2,13 +2,14 @@ import os
 import torch
 import numpy as np
 import pandas as pd
-
+import csv
 
 class DatasetFormatter:
     """
     Load all segments, merges it into one array, split it on EQUAL segments and saves on disk.
     Creates annotation file.
     """
+    
     def __init__(self, path_to_dataset: str):
         if os.path.exists(path_to_dataset) is False:
             raise ValueError('There is no such path')
@@ -16,7 +17,9 @@ class DatasetFormatter:
         self.path = path_to_dataset
         self.folders_with_patients = os.listdir(self.path)
         self.verbose = verbose
-        
+        self.segment_time = 0
+        self.frq = 60
+        self.path_to_save = ""
         self.patients_data = []
         for patient in self.folders_with_patients:
             self.patients_data.append(os.listdir(os.path.join(self.path + patient)))
@@ -65,7 +68,8 @@ class DatasetFormatter:
         Creates segments with equal size
         """
         patients = self.get_patients_names()
-        
+        self.segment_time = segment_time
+        self.path_to_save = path_to_save
         for patient in patients:
             current_folder = os.path.join(self.path, patient)
             
@@ -97,12 +101,54 @@ class DatasetFormatter:
                 dfs = [pd.read_parquet(segment) for segment in sensor_data]
                 concatenated_df = pd.concat(dfs, ignore_index=True)
                 
-                num_parts = int(len(concatenated_df) / (segment_time * 128))
+                num_parts = int(len(concatenated_df) / (self.segment_time * self.frq))
          
                 parts = np.array_split(concatenated_df, num_parts)
-
+            
                 for i, part in enumerate(parts):
-                    part.to_parquet(os.path.join(path_to_save, '_'.join([patient, signal_name, str(i)]) + '.parquet'),
+                    part.to_parquet(os.path.join(self.path_to_save, '_'.join([patient, signal_name, str(i)]) + '.parquet'),
                                                  index=False)
             
+                
+    def labels_set(self):
+        """
+        Get .cvs metadata and calculate labels for each segment from each Patient
+        """
+        if(self.segment_time == 0):
+            raise ValueError("self.segment_time is 0. This mean there have not been segmentation process for signals yet.")
+        segment_length = self.segment_time * self.frq
         
+        for patient in self.folders_with_patients:
+            filename = patient+"labels.csv"
+            labels_file = pd.read_csv(filename)
+            duration = labels_file['duration'].iloc[0]
+            start_time = labels_file['startTime'].iloc[0]
+            total_segments = int(duration.total_seconds() / (segment_length))
+            labels = []
+            for i in range(total_segments):
+                segment_start = start_time + i * segment_length
+                segment_end = segment_start + segment_length
+                labels.append(0)
+                for j in range(len(labels_file)):
+                    if (labels_file['labels.startTime'][j] + labels_file['labels.duration'][j] > segment_start and 
+                        labels_file['labels.startTime'][j] + labels_file['labels.duration'][j] <= segment_end):
+                        labels[-1] = 1
+            full_path = os.path.join(self.path_to_save, filename)
+            with open(full_path, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(['segment', 'label'])  # writing the headers
+                for idx, label in enumerate(labels):
+                    writer.writerow([idx, label])
+    def simple_normilization(self, segment_file: str):
+        """
+        Take .parquet files normilize them with simple algorithm
+        """
+        for patient in self.folders_with_patients:
+            full_path = os.path.join(self.path_to_save, '_'.join([patient, signal_name, str(i)]) + '.parquet'
+            part = pd.read_parquet(full_path)
+
+            mean = part['data'].mean()
+            std_dev = part['data'].std()
+            part['data'] = (part['data'] - mean) / std_dev
+
+            part.to_parquet(full_path, index=False)
