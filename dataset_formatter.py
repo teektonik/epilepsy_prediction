@@ -3,6 +3,8 @@ import torch
 import numpy as np
 import pandas as pd
 import csv
+from tqdm import tqdm
+
 
 class DatasetFormatter:
     """
@@ -10,7 +12,7 @@ class DatasetFormatter:
     Creates annotation file.
     """
     
-    def __init__(self, path_to_dataset: str):
+    def __init__(self, path_to_dataset: str, verbose: bool=True):
         if os.path.exists(path_to_dataset) is False:
             raise ValueError('There is no such path')
             
@@ -23,6 +25,15 @@ class DatasetFormatter:
         self.patients_data = []
         for patient in self.folders_with_patients:
             self.patients_data.append(os.listdir(os.path.join(self.path + patient)))
+            
+    def get_patients_data(self, patient: str) -> list[str]:
+        return os.listdir(os.path.join(self.path, patient))
+    
+    def get_patients_names(self) -> list[str]:
+        return os.listdir(self.path)
+    
+    def _get_only_one_sensors(self, sensors: list, sensor_name: str):
+        return list(filter(lambda x: sensor_name in x, sensors))
     
     def get_all_sensors_records_for_patient(self, patient: str) -> list[str]:
         if patient not in self.get_patients_names():
@@ -34,7 +45,7 @@ class DatasetFormatter:
                 if os.path.isdir(os.path.join(full_path_to_patient, name)) 
                 and name[0] != '.']
     
-    def _get_sorted_segments(self, sensor_folder: str) -> list[list]:
+    def _get_sorted_segments(self, sensor_folder: str) -> (list, list[list]):
         """
         Get types of sensors from folder and sort its data by number of segment
         """
@@ -55,7 +66,7 @@ class DatasetFormatter:
             sorted_list = sorted(data, key=lambda x: int(x[index_of_segments_number].split('.')[0]))
             return_data.append(['_'.join(file) for file in sorted_list])
     
-        return return_data
+        return unique_parameters, return_data
     
     def _upsample(self, data: np.array, sample_rate: float, new_sample_rate: float, mode: str = 'bicubic'):
         scale_factor = new_sample_rate / sample_rate
