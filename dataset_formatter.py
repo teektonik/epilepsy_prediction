@@ -3,7 +3,11 @@ import torch
 import numpy as np
 import pandas as pd
 import csv
+import glob
 from tqdm import tqdm
+
+def get_parquet_files(directory):
+    return glob.glob(f"{directory}/*.parquet")
 
 
 class DatasetFormatter:
@@ -128,34 +132,41 @@ class DatasetFormatter:
         if(self.segment_time == 0):
             raise ValueError("self.segment_time is 0. This mean there have not been segmentation process for signals yet.")
         segment_length = self.segment_time * self.frq
-        
+        columns = ['Patient', 'Segment', 'Label']
+
+        label_df = pd.DataFrame(columns=columns)
+
         for patient in self.folders_with_patients:
-            filename = patient+"labels.csv"
+            filename = os.path.join(self.path, patient, patient+'_'+"labels.csv")
             labels_file = pd.read_csv(filename)
             duration = labels_file['duration'].iloc[0]
             start_time = labels_file['startTime'].iloc[0]
-            total_segments = int(duration.total_seconds() / (segment_length))
-            labels = []
-            for i in range(total_segments):
+            total_segments = int(duration / (segment_length))
+            label = 0
+            for i in tqdm(range(total_segments), desc='Patient: {}'.format(patient)):
                 segment_start = start_time + i * segment_length
                 segment_end = segment_start + segment_length
-                labels.append(0)
+                label = 0
                 for j in range(len(labels_file)):
                     if (labels_file['labels.startTime'][j] + labels_file['labels.duration'][j] > segment_start and 
                         labels_file['labels.startTime'][j] + labels_file['labels.duration'][j] <= segment_end):
-                        labels[-1] = 1
-            full_path = os.path.join(self.path_to_save, filename)
-            with open(full_path, 'w', newline='') as f:
-                writer = csv.writer(f)
-                writer.writerow(['segment', 'label'])  # writing the headers
-                for idx, label in enumerate(labels):
-                    writer.writerow([idx, label])
-    def simple_normilization(self, segment_file: str):
+                        label = 1
+                new_row = pd.DataFrame([[patient, i, label]], columns=columns)
+    
+                label_df = pd.concat([label_df, pd.DataFrame(new_row)], ignore_index=True)
+        return label_df
+        
+    def simple_normilization(self):
         """
         Take .parquet files normilize them with simple algorithm
         """
-        for patient in self.folders_with_patients:
-            full_path = os.path.join(self.path_to_save, '_'.join([patient, signal_name, str(i)]) + '.parquet'
+        
+        # Usage
+        directory = self.path_to_save
+        parquet_files = get_parquet_files(directory)
+        print(parquet_files)
+
+        for full_path in parquet_files:
             part = pd.read_parquet(full_path)
 
             mean = part['data'].mean()
@@ -163,3 +174,4 @@ class DatasetFormatter:
             part['data'] = (part['data'] - mean) / std_dev
 
             part.to_parquet(full_path, index=False)
+
