@@ -5,6 +5,14 @@ import pandas as pd
 import csv
 import glob
 from tqdm import tqdm
+import re
+def get_all_patient_parquet_files_with_same_segment_number(directory, patient, i):
+    files = ''
+    pattern = re.compile(f"{patient}.*_{i}\.parquet$")
+    files = [f for f in glob.glob(f"{directory}/{patient}*.parquet") if pattern.search(f)]
+    files = "|".join(files)
+    return files
+
 
 class DatasetFormatter:
     """
@@ -138,7 +146,7 @@ class DatasetFormatter:
         if(self.segment_time == 0):
             raise ValueError("self.segment_time is 0. This mean there have not been segmentation process for signals yet.")
         segment_length = self.segment_time * self.frequency
-        columns = ['Patient', 'Segment', 'Label']
+        columns = ['Patient', 'Segment', 'Label', 'Files']
 
         label_df = pd.DataFrame(columns=columns)
 
@@ -155,16 +163,18 @@ class DatasetFormatter:
                 segment_start = start_time + i * segment_length
                 segment_end = segment_start + segment_length
                 label = 0
+                files = ''
                 for j in range(len(labels_file)):
                     if (segment_start < labels_file['labels.startTime'][j] + labels_file['labels.duration'][j] <= segment_end or
                        segment_start < labels_file['labels.startTime'][j] <= segment_end):
                         label = 1
-                new_row = pd.DataFrame([[patient, i, label]], columns=columns)
-    
+                files = get_all_patient_parquet_files_with_same_segment_number(self.path_to_save_normalization,
+                                                                              patient, i)
+                new_row = pd.DataFrame([[patient, i, label, files]], columns=columns)
                 label_df = pd.concat([label_df, pd.DataFrame(new_row)], ignore_index=True)
 
         label_df.to_csv(os.path.join('/workspace', 'labels.csv'), index=False)
-        
+        return label_df
     def simple_normalization(self, path_norm:str):
         """
         Take .parquet files normilize them with simple algorithm
