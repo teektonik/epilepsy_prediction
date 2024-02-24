@@ -6,35 +6,41 @@ import csv
 import glob
 from tqdm import tqdm
 
-def get_parquet_files(directory):
-    return glob.glob(f"{directory}/*.parquet")
-
-
 class DatasetFormatter:
     """
     Load all segments, merges it into one array, split it on EQUAL segments and saves on disk.
     Creates annotation file.
     """
     
-    def __init__(self, path_to_dataset: str, verbose: bool=True):
+    def __init__(self, path_to_dataset: str, 
+                 verbose: bool=True, 
+                 path_to_save: str="/workspace/new_data/", 
+                 path_to_save_normalization: str="/workspace/normalized_data/",
+                 frequency: int=60, 
+                 segment_time: int=180):
+        
         if os.path.exists(path_to_dataset) is False:
             raise ValueError('There is no such path')
             
+        self.segment_time = segment_time
+        self.path_to_save = path_to_save
         self.path = path_to_dataset
         self.folders_with_patients = os.listdir(self.path)
+        self.path_to_save_normalization = path_to_save_normalization
         self.verbose = verbose
-        self.segment_time = 0
-        self.frq = 60
-        self.path_to_save = ""
+        self.frequency = frequency
         self.patients_data = []
+        
         for patient in self.folders_with_patients:
             self.patients_data.append(os.listdir(os.path.join(self.path + patient)))
+            
+        self.folders_with_patients = [self.folders_with_patients[0]]
             
     def get_patients_data(self, patient: str) -> list[str]:
         return os.listdir(os.path.join(self.path, patient))
     
     def get_patients_names(self) -> list[str]:
-        return os.listdir(self.path)
+        return self.folders_with_patients
     
     def _get_only_one_sensors(self, sensors: list, sensor_name: str):
         return list(filter(lambda x: sensor_name in x, sensors))
@@ -116,7 +122,7 @@ class DatasetFormatter:
                 dfs = [pd.read_parquet(segment) for segment in sensor_data]
                 concatenated_df = pd.concat(dfs, ignore_index=True)
                 
-                num_parts = int(len(concatenated_df) / (self.segment_time * self.frq))
+                num_parts = int(len(concatenated_df) / (self.segment_time * self.frequency))
          
                 parts = np.array_split(concatenated_df, num_parts)
             
@@ -131,47 +137,45 @@ class DatasetFormatter:
         """
         if(self.segment_time == 0):
             raise ValueError("self.segment_time is 0. This mean there have not been segmentation process for signals yet.")
-        segment_length = self.segment_time * self.frq
+        segment_length = self.segment_time * self.frequency
         columns = ['Patient', 'Segment', 'Label']
 
         label_df = pd.DataFrame(columns=columns)
 
         for patient in self.folders_with_patients:
+            
             filename = os.path.join(self.path, patient, patient+'_'+"labels.csv")
             labels_file = pd.read_csv(filename)
             duration = labels_file['duration'].iloc[0]
             start_time = labels_file['startTime'].iloc[0]
             total_segments = int(duration / (segment_length))
             label = 0
+            
             for i in tqdm(range(total_segments), desc='Patient: {}'.format(patient)):
                 segment_start = start_time + i * segment_length
                 segment_end = segment_start + segment_length
                 label = 0
                 for j in range(len(labels_file)):
-                    if (labels_file['labels.startTime'][j] + labels_file['labels.duration'][j] > segment_start and 
-                        labels_file['labels.startTime'][j] + labels_file['labels.duration'][j] <= segment_end):
+                    if (segment_start < labels_file['labels.startTime'][j] + labels_file['labels.duration'][j] <= segment_end or
+                       segment_start < labels_file['labels.startTime'][j] <= segment_end):
                         label = 1
                 new_row = pd.DataFrame([[patient, i, label]], columns=columns)
     
                 label_df = pd.concat([label_df, pd.DataFrame(new_row)], ignore_index=True)
-        return label_df
+
+        label_df.to_csv(os.path.join('/workspace', 'labels.csv'), index=False)
         
-    def simple_normilization(self):
+    def simple_normalization(self, path_norm:str):
         """
         Take .parquet files normilize them with simple algorithm
         """
-        
-        # Usage
-        directory = self.path_to_save
-        parquet_files = get_parquet_files(directory)
-        print(parquet_files)
+        parquet_files =os.listdir(self.path_to_save)
 
-        for full_path in parquet_files:
-            part = pd.read_parquet(full_path)
+        for full_path in tqdm(parquet_files):
+            part = pd.read_parquet(os.path.join(self.path_to_save, full_path))
 
             mean = part['data'].mean()
             std_dev = part['data'].std()
             part['data'] = (part['data'] - mean) / std_dev
-
-            part.to_parquet(full_path, index=False)
+            part.to_parquet(os.path.join(self.path_to_save_normalization, full_path), index=False)
 
