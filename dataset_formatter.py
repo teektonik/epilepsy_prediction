@@ -148,7 +148,7 @@ class DatasetFormatter:
             labels_file = pd.read_csv(filename)
             duration = labels_file['duration'].iloc[0]
             start_time = labels_file['startTime'].iloc[0]
-            total_segments = int(duration / (segment_length))
+            total_segments = int(duration * self.frequency / (segment_length))
             label = 0
             
             for i in tqdm(range(total_segments), desc='Patient: {}'.format(patient)):
