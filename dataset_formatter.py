@@ -5,6 +5,8 @@ import pandas as pd
 import csv
 import glob
 from tqdm import tqdm
+import re 
+from sklearn.utils import resample
 
 class DatasetFormatter:
     """
@@ -178,4 +180,77 @@ class DatasetFormatter:
             std_dev = part['data'].std()
             part['data'] = (part['data'] - mean) / std_dev
             part.to_parquet(os.path.join(self.path_to_save_normalization, full_path), index=False)
+            
+    def noise_data_augmentation(path_to_data, path_to_labels, labels_to_augment):
 
+        # Load the label.csv file
+        df_label = pd.read_csv(path_to_labels)
+
+        df_label_1 = df_label[df_label['Label'] == labels_to_augment]
+
+        # Get the maximum segment index in the existing label.csv file
+        max_segment = df_label['Segment'].max()
+        columns = ['Patient', 'Segment', 'Label']
+        # Iterate over the filtered dataframe
+        for index, row in df_label_1.iterrows():
+            segment = row['Segment']
+            patient = row['Patient']
+
+            pattern = re.compile(f"{patient}.*_{i}\.parquet$")
+            files = [f for f in glob.glob(f"{path_to_data}/{patient}*.parquet") if pattern.search(f)]
+            for file in files:
+                df_signal = pd.read_parquet(os.path.join(file))
+
+                # Add noise to the signal data
+                noise = np.random.normal(0, 1, df_signal.shape)
+                df_signal_noisy = df_signal + noise
+
+                # Increment the maximum segment index
+                max_segment += 1
+                # Create new file name with new segment in it
+                parts = file.split('/')
+                last_part = parts[-1]
+                sub_parts = last_part.split('_')
+                last_sub_part = sub_parts[-1]
+                final_parts = last_sub_part.split('.')
+                final_parts[0] = str(max_segment)
+                last_sub_part = '.'.join(final_parts)
+                sub_parts[-1] = last_sub_part
+                last_part = '_'.join(sub_parts)
+                parts[-1] = last_part
+                new_file= '/'.join(parts)
+                
+                # Save the noisy signal data to a new parquet file with the new index
+                df_signal_noisy.to_parquet(new_file, index=False)
+
+                new_row = pd.DataFrame([[patient, max_segment, labels_to_augment]], columns=columns)
+
+                df_label = pd.concat([df_label, pd.DataFrame(new_row)], ignore_index=True)    
+        # Save the updated label.csv file
+        df_label.to_csv(path_to_labels, index=False)
+
+    def balance_by_downsaple(path_to_labels, path_to_save_balanced_labels, new_labels_file_name, ration):
+        # Load the dataset
+        df = pd.read_csv(path_to_labels)
+
+        # Check the class distribution
+        print(df['Label'].value_counts())
+
+        # Separate majority and minority classes
+        df_majority = df[df.Label == 0]
+        df_minority = df[df.Label == 1]
+
+        # Downsample majority class
+        df_majority_downsampled = resample(df_majority, 
+                                         replace=False,    # sample without replacement
+                                         n_samples=int(len(df_minority) * ration),     # to match minority class
+                                         random_state=123) # reproducible results
+
+        # Combine minority class with downsampled majority class
+        df_downsampled = pd.concat([df_majority_downsampled, df_minority])
+
+        # Display new class counts
+        print(df_downsampled.Label.value_counts())
+
+        # Save the new downsampled dataset
+        df_downsampled.to_csv(os.path.join(path_to_save_balanced_labels, new_labels_file_name), index=False)
