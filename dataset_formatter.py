@@ -8,27 +8,6 @@ from tqdm import tqdm
 import re 
 from sklearn.utils import resample
 
-def process_file_name(file_name, segment):
-    # Split the file name by '/'
-    parts = file_name.split('/')
-    # Take the last part
-    last_part = parts[-1]
-    # Split it by '_'
-    sub_parts = last_part.split('_')
-    # Take the last part
-    last_sub_part = sub_parts[-1]
-    # Split it again by '.'
-    final_parts = last_sub_part.split('.')
-    # Replace the first part with the string variable 'segment'
-    final_parts[0] = segment
-    # Concatenate it back
-    last_sub_part = '.'.join(final_parts)
-    sub_parts[-1] = last_sub_part
-    last_part = '_'.join(sub_parts)
-    parts[-1] = last_part
-    result = '/'.join(parts)
-    return result
-
 class DatasetFormatter:
     """
     Load all segments, merges it into one array, split it on EQUAL segments and saves on disk.
@@ -228,9 +207,21 @@ class DatasetFormatter:
 
                 # Increment the maximum segment index
                 max_segment += 1
-                process_file_name()
+                # Create new file name with new segment in it
+                parts = file.split('/')
+                last_part = parts[-1]
+                sub_parts = last_part.split('_')
+                last_sub_part = sub_parts[-1]
+                final_parts = last_sub_part.split('.')
+                final_parts[0] = str(max_segment)
+                last_sub_part = '.'.join(final_parts)
+                sub_parts[-1] = last_sub_part
+                last_part = '_'.join(sub_parts)
+                parts[-1] = last_part
+                new_file= '/'.join(parts)
+                
                 # Save the noisy signal data to a new parquet file with the new index
-                df_signal_noisy.to_parquet(process_file_name(file, str(max_segment)), index=False)
+                df_signal_noisy.to_parquet(new_file, index=False)
 
                 new_row = pd.DataFrame([[patient, max_segment, labels_to_augment]], columns=columns)
 
@@ -246,13 +237,13 @@ class DatasetFormatter:
         print(df['Label'].value_counts())
 
         # Separate majority and minority classes
-        df_majority = df[df.Label==0]
-        df_minority = df[df.Label==1]
+        df_majority = df[df.Label == 0]
+        df_minority = df[df.Label == 1]
 
         # Downsample majority class
         df_majority_downsampled = resample(df_majority, 
                                          replace=False,    # sample without replacement
-                                         n_samples=int(len(df_minority)*ration),     # to match minority class
+                                         n_samples=int(len(df_minority) * ration),     # to match minority class
                                          random_state=123) # reproducible results
 
         # Combine minority class with downsampled majority class
