@@ -6,6 +6,8 @@ import csv
 import glob
 from tqdm import tqdm
 import re 
+from sklearn.utils import resample
+
 def process_file_name(file_name, segment):
     # Split the file name by '/'
     parts = file_name.split('/')
@@ -234,4 +236,30 @@ class DatasetFormatter:
 
                 df_label = pd.concat([df_label, pd.DataFrame(new_row)], ignore_index=True)    
         # Save the updated label.csv file
-        df_label.to_csv('label.csv', index=False)
+        df_label.to_csv(path_to_labels, index=False)
+
+    def balance_by_downsaple(path_to_labels, path_to_save_balanced_labels, new_labels_file_name, ration):
+        # Load the dataset
+        df = pd.read_csv(path_to_labels)
+
+        # Check the class distribution
+        print(df['Label'].value_counts())
+
+        # Separate majority and minority classes
+        df_majority = df[df.Label==0]
+        df_minority = df[df.Label==1]
+
+        # Downsample majority class
+        df_majority_downsampled = resample(df_majority, 
+                                         replace=False,    # sample without replacement
+                                         n_samples=int(len(df_minority)*ration),     # to match minority class
+                                         random_state=123) # reproducible results
+
+        # Combine minority class with downsampled majority class
+        df_downsampled = pd.concat([df_majority_downsampled, df_minority])
+
+        # Display new class counts
+        print(df_downsampled.Label.value_counts())
+
+        # Save the new downsampled dataset
+        df_downsampled.to_csv(os.path.join(path_to_save_balanced_labels, new_labels_file_name), index=False)
