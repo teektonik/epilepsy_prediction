@@ -36,8 +36,6 @@ class DatasetFormatter:
         for patient in self.folders_with_patients:
             self.patients_data.append(os.listdir(os.path.join(self.path + patient)))
             
-        self.folders_with_patients = [self.folders_with_patients[0]]
-            
     def get_patients_data(self, patient: str) -> list[str]:
         return os.listdir(os.path.join(self.path, patient))
     
@@ -181,7 +179,7 @@ class DatasetFormatter:
             part['data'] = (part['data'] - mean) / std_dev
             part.to_parquet(os.path.join(self.path_to_save_normalization, full_path), index=False)
             
-    def noise_data_augmentation(path_to_data, path_to_labels, labels_to_augment):
+    def noise_data_augmentation(self, path_to_data, path_to_labels, labels_to_augment):
 
         # Load the label.csv file
         df_label = pd.read_csv(path_to_labels)
@@ -229,7 +227,7 @@ class DatasetFormatter:
         # Save the updated label.csv file
         df_label.to_csv(path_to_labels, index=False)
 
-    def balance_by_downsaple(path_to_labels, path_to_save_balanced_labels, new_labels_file_name, ration):
+    def balance_by_downsaple(self, path_to_labels, path_to_save_balanced_labels, new_labels_file_name, ration):
         # Load the dataset
         df = pd.read_csv(path_to_labels)
 
