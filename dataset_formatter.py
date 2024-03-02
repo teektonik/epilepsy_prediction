@@ -5,14 +5,27 @@ import pandas as pd
 import csv
 import glob
 from tqdm import tqdm
-import re
-def get_all_patient_parquet_files_with_same_segment_number(directory, patient, i):
-    files = ''
-    pattern = re.compile(f"{patient}.*_{i}\.parquet$")
-    files = [f for f in glob.glob(f"{directory}/{patient}*.parquet") if pattern.search(f)]
-    files = "|".join(files)
-    return files
-
+import re 
+def process_file_name(file_name, segment):
+    # Split the file name by '/'
+    parts = file_name.split('/')
+    # Take the last part
+    last_part = parts[-1]
+    # Split it by '_'
+    sub_parts = last_part.split('_')
+    # Take the last part
+    last_sub_part = sub_parts[-1]
+    # Split it again by '.'
+    final_parts = last_sub_part.split('.')
+    # Replace the first part with the string variable 'segment'
+    final_parts[0] = segment
+    # Concatenate it back
+    last_sub_part = '.'.join(final_parts)
+    sub_parts[-1] = last_sub_part
+    last_part = '_'.join(sub_parts)
+    parts[-1] = last_part
+    result = '/'.join(parts)
+    return result
 
 class DatasetFormatter:
     """
@@ -146,7 +159,7 @@ class DatasetFormatter:
         if(self.segment_time == 0):
             raise ValueError("self.segment_time is 0. This mean there have not been segmentation process for signals yet.")
         segment_length = self.segment_time * self.frequency
-        columns = ['Patient', 'Segment', 'Label', 'Files']
+        columns = ['Patient', 'Segment', 'Label']
 
         label_df = pd.DataFrame(columns=columns)
 
@@ -163,18 +176,16 @@ class DatasetFormatter:
                 segment_start = start_time + i * segment_length
                 segment_end = segment_start + segment_length
                 label = 0
-                files = ''
                 for j in range(len(labels_file)):
                     if (segment_start < labels_file['labels.startTime'][j] + labels_file['labels.duration'][j] <= segment_end or
                        segment_start < labels_file['labels.startTime'][j] <= segment_end):
                         label = 1
-                files = get_all_patient_parquet_files_with_same_segment_number(self.path_to_save_normalization,
-                                                                              patient, i)
-                new_row = pd.DataFrame([[patient, i, label, files]], columns=columns)
+                new_row = pd.DataFrame([[patient, i, label]], columns=columns)
+    
                 label_df = pd.concat([label_df, pd.DataFrame(new_row)], ignore_index=True)
 
         label_df.to_csv(os.path.join('/workspace', 'labels.csv'), index=False)
-        return label_df
+        
     def simple_normalization(self, path_norm:str):
         """
         Take .parquet files normilize them with simple algorithm
@@ -188,4 +199,39 @@ class DatasetFormatter:
             std_dev = part['data'].std()
             part['data'] = (part['data'] - mean) / std_dev
             part.to_parquet(os.path.join(self.path_to_save_normalization, full_path), index=False)
+            
+    def noise_data_augmentation(path_to_data, path_to_labels, labels_to_augment):
 
+        # Load the label.csv file
+        df_label = pd.read_csv(path_to_labels)
+
+        df_label_1 = df_label[df_label['Label'] == labels_to_augment]
+
+        # Get the maximum segment index in the existing label.csv file
+        max_segment = df_label['Segment'].max()
+        columns = ['Patient', 'Segment', 'Label']
+        # Iterate over the filtered dataframe
+        for index, row in df_label_1.iterrows():
+            segment = row['Segment']
+            patient = row['Patient']
+
+            pattern = re.compile(f"{patient}.*_{i}\.parquet$")
+            files = [f for f in glob.glob(f"{path_to_data}/{patient}*.parquet") if pattern.search(f)]
+            for file in files:
+                df_signal = pd.read_parquet(os.path.join(file))
+
+                # Add noise to the signal data
+                noise = np.random.normal(0, 1, df_signal.shape)
+                df_signal_noisy = df_signal + noise
+
+                # Increment the maximum segment index
+                max_segment += 1
+                process_file_name()
+                # Save the noisy signal data to a new parquet file with the new index
+                df_signal_noisy.to_parquet(process_file_name(file, str(max_segment)), index=False)
+
+                new_row = pd.DataFrame([[patient, max_segment, labels_to_augment]], columns=columns)
+
+                df_label = pd.concat([df_label, pd.DataFrame(new_row)], ignore_index=True)    
+        # Save the updated label.csv file
+        df_label.to_csv('label.csv', index=False)
