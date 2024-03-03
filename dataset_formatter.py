@@ -18,7 +18,7 @@ class DatasetFormatter:
                  verbose: bool=True, 
                  path_to_save: str="/workspace/new_data/", 
                  path_to_save_normalization: str="/workspace/normalized_data/",
-                 frequency: int=60, 
+                 frequency: int=128, 
                  segment_time: int=180):
         
         if os.path.exists(path_to_dataset) is False:
@@ -91,13 +91,22 @@ class DatasetFormatter:
         patients = self.get_patients_names()
         self.segment_time = segment_time
         self.path_to_save = path_to_save
+        
+        #Create dataframe for segment labels
+        columns = ['Patient', 'Segment', 'Label', 'Files']
+        label_df = pd.DataFrame(columns=columns)
+        
         for patient in patients:
+            #Get metadata ablout epileptic events
+            filename = os.path.join(self.path, patient, patient + '_' + "labels.csv")
+            labels_file = pd.read_csv(filename)
+            
             current_folder = os.path.join(self.path, patient)
             
-            label_file = os.path.join(current_folder,
-                                      [filename for filename in os.listdir(current_folder) if 'labels' in filename][0])
+            #label_file = os.path.join(current_folder,
+                                      #[filename for filename in os.listdir(current_folder) if 'labels' in filename][0])
             
-            labels = pd.read_csv(label_file)
+            #labels = pd.read_csv(label_file)
             sensors = self.get_all_sensors_records_for_patient(patient)
             sensors = self._get_only_one_sensors(sensors, 'Empatica')
             
@@ -127,9 +136,38 @@ class DatasetFormatter:
                 parts = np.array_split(concatenated_df, num_parts)
             
                 for i, part in enumerate(parts):
+                    #Path to new segment of signal 
+                    file_path = os.path.join(self.path_to_save, '_'.join([patient, signal_name, str(i)]) + '.parquet')
+                    
+                    mask = (label_df['Patient'] == patient) & (label_df['Segment'] == i)
+                    
+                    if label_df[mask].any().any():
+                        #if the row exists, append the new file paths to the existing ones
+                        existing_files = label_df.loc[mask, 'Files'].values[0]
+                        
+                        if pd.isna(existing_files):
+                            #if the existing value is NaN, replace it with the new file paths
+                            label_df.loc[mask, 'Files'] = file_path
+                        else:
+                            # otherwise, append the new file paths
+                            label_df.loc[mask, 'Files'] = existing_files + ', ' + ', ' + file_path
+                    else:
+                        #Label calculation/set
+                        segment_start =  part['time'].iloc[0]
+                        segment_end =  part['time'].iloc[len(part)-1]
+                        label = 0
+                        for j in range(len(labels_file)):
+                            if (segment_start < labels_file['labels.startTime'][j] + labels_file['labels.duration'][j] <= segment_end or
+                               segment_start < labels_file['labels.startTime'][j] <= segment_end):
+                                label = 1
+                        
+                        new_row = pd.DataFrame([[patient, i, label, file_path]], columns=columns)
+                        label_df = pd.concat([label_df, pd.DataFrame(new_row)], ignore_index=True)
+                    
                     part.to_parquet(os.path.join(self.path_to_save, '_'.join([patient, signal_name, str(i)]) + '.parquet'),
                                                  index=False)
-            
+        label_df.to_csv(os.path.join('/workspace', 'labels.csv'), index=False)
+        
                 
     def labels_set(self):
         """
@@ -137,18 +175,18 @@ class DatasetFormatter:
         """
         if(self.segment_time == 0):
             raise ValueError("self.segment_time is 0. This mean there have not been segmentation process for signals yet.")
-        segment_length = self.segment_time * self.frequency
         columns = ['Patient', 'Segment', 'Label']
 
         label_df = pd.DataFrame(columns=columns)
 
         for patient in self.folders_with_patients:
             
-            filename = os.path.join(self.path, patient, patient+'_'+"labels.csv")
+            filename = os.path.join(self.path, patient, patient + '_' + "labels.csv")
             labels_file = pd.read_csv(filename)
             duration = labels_file['duration'].iloc[0]
             start_time = labels_file['startTime'].iloc[0]
-            total_segments = int(duration * self.frequency / (segment_length))
+            segment_length = self.segment_time * self.frequency
+            total_segments = int(duration * 128 / (segment_length))
             label = 0
             
             for i in tqdm(range(total_segments), desc='Patient: {}'.format(patient)):
@@ -160,7 +198,7 @@ class DatasetFormatter:
                        segment_start < labels_file['labels.startTime'][j] <= segment_end):
                         label = 1
                 new_row = pd.DataFrame([[patient, i, label]], columns=columns)
-    
+                
                 label_df = pd.concat([label_df, pd.DataFrame(new_row)], ignore_index=True)
 
         label_df.to_csv(os.path.join('/workspace', 'labels.csv'), index=False)
