@@ -146,26 +146,38 @@ class DatasetFormatter:
                 concatenated_df = pd.concat(dfs, ignore_index=True)
                 concatenated_df_signals.append(concatenated_df)
                 #parts = np.array_split(concatenated_df, len(concatenated_df) // segment_length)
-            start = 0
+            starts = [0] * len(concatenated_df_signals)
             segment_index = 0
             no_hole_detected = True
             num_lenght = [len(concatenated_df) // segment_length for concatenated_df in concatenated_df_signals]
             pbar = tqdm(total=max(num_lenght), desc= patient + " Signals segmentation")
-            while True:
+            while all(starts[i] + segment_length < len(concatenated_df) for i, concatenated_df in enumerate(concatenated_df_signals)):
+                while not all(concatenated_df.iloc[starts[i]]['time'] == concatenated_df_signals[0].iloc[starts[0]]['time'] for i, concatenated_df in enumerate(concatenated_df_signals)):
+                    #print(starts)
+                    #print([concatenated_df.iloc[starts[i]]['time'] for i, concatenated_df in enumerate(concatenated_df_signals)])
+                    max_index = max(enumerate([concatenated_df.iloc[starts[i]]['time'] for i, concatenated_df in enumerate(concatenated_df_signals)]), key=lambda x: x[1])[0]
+                    #print(max_index)
+                    starts = [start + int((concatenated_df_signals[max_index].iloc[starts[max_index]]['time'] - concatenated_df_signals[i].iloc[start]['time'])//7.8125) for i, start in enumerate(starts)] 
+                    if any(starts[j] + segment_length >= len(concatenated_df) for j, concatenated_df in enumerate(concatenated_df_signals)):
+                        break
+                if any(starts[i] + segment_length >= len(concatenated_df) for i, concatenated_df in enumerate(concatenated_df_signals)):
+                    break
+                #print(starts)
+                #print([concatenated_df.iloc[starts[i]]['time'] for i, concatenated_df in enumerate(concatenated_df_signals)])
+                #print('+')
                 parts = []
                 #print(start,  [len(concatenated_df) for concatenated_df in concatenated_df_signals])
-                if  any(start >= len(concatenated_df) for concatenated_df in concatenated_df_signals):
-                    break
-                last_hole_index = -1
-                for concatenated_df in concatenated_df_signals:
-                    part = concatenated_df.iloc[start : start + segment_length]
-                    hole_index = find_holes(part, start)
-                    if hole_index is not None and hole_index > last_hole_index:
-                        start = hole_index
-                        #print('hole found', start)
+                
+                for i, concatenated_df in enumerate(concatenated_df_signals):
+                    part = concatenated_df.iloc[starts[i] : starts[i] + segment_length]
+                    hole_index = find_holes(part, starts[i])
+                    if hole_index is not None:
+                        starts[i]= hole_index
+                        #print('hole found', starts)
                         no_hole_detected = False
-                        break
+                        continue 
                     parts.append(part)
+                    
                 if no_hole_detected:
                     for i, part in enumerate(parts):
                         file_path = os.path.join(self.path_to_save, '_'.join([patient, sensors_signals_names[i], str(segment_index)]) + '.parquet')
@@ -197,7 +209,7 @@ class DatasetFormatter:
                         #print(file_path, ': ', len(part))
                         part.to_parquet(file_path, index=False)
                     segment_index += 1 
-                    start += segment_length
+                    starts = [start + segment_length for start in starts]
                 no_hole_detected = True
                 pbar.update(1)
             pbar.close()
