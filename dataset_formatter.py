@@ -8,6 +8,18 @@ from tqdm import tqdm
 import re 
 from sklearn.utils import resample
 
+
+def find_holes(df, start = 0 , diff_value=7.8125):
+    # Calculate the difference between current and previous timestamp
+    time_distance = df.loc[start:, 'time'].diff()
+    time_distance[start] = diff_value
+
+    # Find where the difference is not equal to diff_value
+    holes =  time_distance != diff_value
+    
+    last_hole_index = holes[holes].last_valid_index()
+    return last_hole_index
+
 class DatasetFormatter:
     """
     Load all segments, merges it into one array, split it on EQUAL segments and saves on disk.
@@ -27,7 +39,7 @@ class DatasetFormatter:
         self.segment_time = segment_time
         self.path_to_save = path_to_save
         self.path = path_to_dataset
-        self.folders_with_patients = os.listdir(self.path)
+        self.folders_with_patients = [os.listdir(self.path)[0]]
         self.path_to_save_normalization = path_to_save_normalization
         self.verbose = verbose
         self.frequency = frequency
@@ -126,46 +138,69 @@ class DatasetFormatter:
                     
             data = zip(sensors_signals_names, sensors_data_segments)    
             data_size = len(sensors_signals_names)
-           
+            concatenated_df_signals = []
+            segment_length = self.segment_time * self.frequency
+            #Concated patient's signals 
             for signal_name, sensor_data in tqdm(data, total=data_size, desc='Patient: {}'.format(patient)):
                 dfs = [pd.read_parquet(segment) for segment in sensor_data]
                 concatenated_df = pd.concat(dfs, ignore_index=True)
-                
-                num_parts = int(len(concatenated_df) / (self.segment_time * self.frequency))
-         
-                parts = np.array_split(concatenated_df, num_parts)
-            
-                for i, part in enumerate(parts):
-                    #Path to new segment of signal 
-                    file_path = os.path.join(self.path_to_save, '_'.join([patient, signal_name, str(i)]) + '.parquet')
+                concatenated_df_signals.append(concatenated_df)
+                #parts = np.array_split(concatenated_df, len(concatenated_df) // segment_length)
+            start = 0
+            segment_index = 0
+            no_hole_detected = True
+            num_lenght = [len(concatenated_df) // segment_length for concatenated_df in concatenated_df_signals]
+            pbar = tqdm(total=max(num_lenght), desc= patient + " Signals segmentation")
+            while True:
+                parts = []
+                #print(start,  [len(concatenated_df) for concatenated_df in concatenated_df_signals])
+                if  any(start >= len(concatenated_df) for concatenated_df in concatenated_df_signals):
+                    break
+                last_hole_index = -1
+                for concatenated_df in concatenated_df_signals:
+                    part = concatenated_df.iloc[start : start + segment_length]
+                    hole_index = find_holes(part, start)
+                    if hole_index is not None and hole_index > last_hole_index:
+                        start = hole_index
+                        #print('hole found', start)
+                        no_hole_detected = False
+                        break
+                    parts.append(part)
+                if no_hole_detected:
+                    for i, part in enumerate(parts):
+                        file_path = os.path.join(self.path_to_save, '_'.join([patient, sensors_signals_names[i], str(segment_index)]) + '.parquet')
+                        mask = (label_df['Patient'] == patient) & (label_df['Segment'] == segment_index)
                     
-                    mask = (label_df['Patient'] == patient) & (label_df['Segment'] == i)
-                    
-                    if label_df[mask].any().any():
-                        #if the row exists, append the new file paths to the existing ones
-                        existing_files = label_df.loc[mask, 'Files'].values[0]
-                        
-                        if pd.isna(existing_files):
-                            #if the existing value is NaN, replace it with the new file paths
-                            label_df.loc[mask, 'Files'] = file_path
+                        if label_df[mask].any().any():
+                            #if the row exists, append the new file paths to the existing ones
+                            existing_files = label_df.loc[mask, 'Files'].values[0]
+
+                            if pd.isna(existing_files):
+                                #if the existing value is NaN, replace it with the new file paths
+                                label_df.loc[mask, 'Files'] = file_path
+                            else:
+                                # otherwise, append the new file paths
+                                label_df.loc[mask, 'Files'] = existing_files + ', ' + file_path
                         else:
-                            # otherwise, append the new file paths
-                            label_df.loc[mask, 'Files'] = existing_files + ', ' + ', ' + file_path
-                    else:
-                        #Label calculation/set
-                        segment_start =  part['time'].iloc[0]
-                        segment_end =  part['time'].iloc[len(part)-1]
-                        label = 0
-                        for j in range(len(labels_file)):
-                            if (segment_start < labels_file['labels.startTime'][j] + labels_file['labels.duration'][j] <= segment_end or
-                               segment_start < labels_file['labels.startTime'][j] <= segment_end):
-                                label = 1
-                        
-                        new_row = pd.DataFrame([[patient, i, label, file_path]], columns=columns)
-                        label_df = pd.concat([label_df, pd.DataFrame(new_row)], ignore_index=True)
-                    
-                    part.to_parquet(os.path.join(self.path_to_save, '_'.join([patient, signal_name, str(i)]) + '.parquet'),
-                                                 index=False)
+                            #Label calculation/set
+                            segment_end =  part['time'].iloc[len(part)-1]
+                            segment_start =  part['time'].iloc[0]
+                            label = 0
+                            for j in range(len(labels_file)):
+                                if (segment_start < labels_file['labels.startTime'][j] + labels_file['labels.duration'][j] <= segment_end 
+                                    or segment_start < labels_file['labels.startTime'][j] <= segment_end):
+                                    label = 1
+
+                            new_row = pd.DataFrame([[patient, segment_index, label, file_path]], columns=columns)
+                            label_df = pd.concat([label_df, pd.DataFrame(new_row)], ignore_index=True)
+
+                        #print(file_path, ': ', len(part))
+                        part.to_parquet(file_path, index=False)
+                    segment_index += 1 
+                    start += segment_length
+                no_hole_detected = True
+                pbar.update(1)
+            pbar.close()
         label_df.to_csv(os.path.join('/workspace', 'labels.csv'), index=False)
         
                 
@@ -211,7 +246,7 @@ class DatasetFormatter:
 
         for full_path in tqdm(parquet_files):
             part = pd.read_parquet(os.path.join(self.path_to_save, full_path))
-
+            #print(len(part))
             mean = part['data'].mean()
             std_dev = part['data'].std()
             part['data'] = (part['data'] - mean) / std_dev
@@ -265,10 +300,12 @@ class DatasetFormatter:
         # Save the updated label.csv file
         df_label.to_csv(path_to_labels, index=False)
 
-    def balance_by_downsaple(self, path_to_labels, path_to_save_balanced_labels, new_labels_file_name, ration):
+    def balance_by_downsaple(self, path_to_labels, path_to_save_balanced_labels, new_labels_file_name, ration, cap):
         # Load the dataset
         df = pd.read_csv(path_to_labels)
 
+        df = df[df['Segment'] <= cap]
+        
         # Check the class distribution
         print(df['Label'].value_counts())
 
