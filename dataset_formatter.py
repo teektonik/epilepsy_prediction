@@ -114,11 +114,7 @@ class DatasetFormatter:
             labels_file = pd.read_csv(filename)
             
             current_folder = os.path.join(self.path, patient)
-            
-            #label_file = os.path.join(current_folder,
-                                      #[filename for filename in os.listdir(current_folder) if 'labels' in filename][0])
-            
-            #labels = pd.read_csv(label_file)
+
             sensors = self.get_all_sensors_records_for_patient(patient)
             sensors = self._get_only_one_sensors(sensors, 'Empatica')
             
@@ -145,7 +141,6 @@ class DatasetFormatter:
                 dfs = [pd.read_parquet(segment) for segment in sensor_data]
                 concatenated_df = pd.concat(dfs, ignore_index=True)
                 concatenated_df_signals.append(concatenated_df)
-                #parts = np.array_split(concatenated_df, len(concatenated_df) // segment_length)
             starts = [0] * len(concatenated_df_signals)
             segment_index = 0
             no_hole_detected = True
@@ -153,27 +148,19 @@ class DatasetFormatter:
             pbar = tqdm(total=max(num_lenght), desc= patient + " Signals segmentation")
             while all(starts[i] + segment_length < len(concatenated_df) for i, concatenated_df in enumerate(concatenated_df_signals)):
                 while not all(concatenated_df.iloc[starts[i]]['time'] == concatenated_df_signals[0].iloc[starts[0]]['time'] for i, concatenated_df in enumerate(concatenated_df_signals)):
-                    #print(starts)
-                    #print([concatenated_df.iloc[starts[i]]['time'] for i, concatenated_df in enumerate(concatenated_df_signals)])
                     max_index = max(enumerate([concatenated_df.iloc[starts[i]]['time'] for i, concatenated_df in enumerate(concatenated_df_signals)]), key=lambda x: x[1])[0]
-                    #print(max_index)
                     starts = [start + int((concatenated_df_signals[max_index].iloc[starts[max_index]]['time'] - concatenated_df_signals[i].iloc[start]['time'])//7.8125) for i, start in enumerate(starts)] 
                     if any(starts[j] + segment_length >= len(concatenated_df) for j, concatenated_df in enumerate(concatenated_df_signals)):
                         break
                 if any(starts[i] + segment_length >= len(concatenated_df) for i, concatenated_df in enumerate(concatenated_df_signals)):
                     break
-                #print(starts)
-                #print([concatenated_df.iloc[starts[i]]['time'] for i, concatenated_df in enumerate(concatenated_df_signals)])
-                #print('+')
                 parts = []
-                #print(start,  [len(concatenated_df) for concatenated_df in concatenated_df_signals])
-                
+
                 for i, concatenated_df in enumerate(concatenated_df_signals):
                     part = concatenated_df.iloc[starts[i] : starts[i] + segment_length]
                     hole_index = find_holes(part, starts[i])
                     if hole_index is not None:
                         starts[i]= hole_index
-                        #print('hole found', starts)
                         no_hole_detected = False
                         continue 
                     parts.append(part)
@@ -206,7 +193,6 @@ class DatasetFormatter:
                             new_row = pd.DataFrame([[patient, segment_index, label, file_path]], columns=columns)
                             label_df = pd.concat([label_df, pd.DataFrame(new_row)], ignore_index=True)
 
-                        #print(file_path, ': ', len(part))
                         part.to_parquet(file_path, index=False)
                     segment_index += 1 
                     starts = [start + segment_length for start in starts]
@@ -258,7 +244,6 @@ class DatasetFormatter:
 
         for full_path in tqdm(parquet_files):
             part = pd.read_parquet(os.path.join(self.path_to_save, full_path))
-            #print(len(part))
             mean = part['data'].mean()
             std_dev = part['data'].std()
             part['data'] = (part['data'] - mean) / std_dev
