@@ -67,11 +67,18 @@ class EpilepsyDataset(Dataset):
         
         paths_to_segments = ['_'.join([os.path.join(self._path_to_data, patient_name), 
                                       signal, segment_id]) + '.parquet' for signal in self._signals_names]
-        signals = np.array([pd.read_parquet(path)['data'] / float(10 ** 9) for path in paths_to_segments])
         
-        concated_signals = torch.tensor(np.concatenate([signals], axis=0)).view(8, self.signal_length)
+        files = [pd.read_parquet(path) for path in paths_to_segments]
+        signals = np.array([x['data'] / float(10 ** 9) for x in files])
         
-        item = torch.cat([concated_signals.unsqueeze(0)], dim=0).view(8, self.signal_length)
+        ms_in_hour = 3_600_000
+        encoded_hours = ((files[0]['time'][0] / ms_in_hour) % 24) / 24
+        encoded_hours = torch.tensor([encoded_hours] * self.signal_length, dtype=torch.float32)
+        
+        concated_signals = torch.tensor(np.concatenate([signals, encoded_hours.reshape(1, len(encoded_hours))], axis=0)) \
+                                                                .view(len(self._signals_names) + 1, self.signal_length)
+        
+        item = torch.cat([concated_signals.unsqueeze(0)], dim=0).view(len(self._signals_names) + 1, self.signal_length)
         item = torch.transpose(item, 0, 1)
         
         # Return the concatenated array as the sample item and its label
