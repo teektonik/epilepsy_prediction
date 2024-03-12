@@ -32,6 +32,13 @@ class EpilepsyDataset(Dataset):
         self._annotation_file = pd.read_csv(self._path_to_annotation_file)
         self._signals_names = signals_names
         self.signal_length = signal_lenght
+    
+        # Class balancing
+        class_0 = self._annotation_file[self._annotation_file['Label'] == 0]
+        class_1 = self._annotation_file[self._annotation_file['Label'] == 1]
+
+        num_samples_to_keep = min(len(class_0), len(class_1))
+        self._annotation_file = pd.concat([class_0.sample(num_samples_to_keep, random_state=42), class_1], axis=0)
         
     def __len__(self):
         """
@@ -60,14 +67,11 @@ class EpilepsyDataset(Dataset):
         
         paths_to_segments = ['_'.join([os.path.join(self._path_to_data, patient_name), 
                                       signal, segment_id]) + '.parquet' for signal in self._signals_names]
-        
-        signals = np.array([pd.read_parquet(path)['data'][:self.signal_length] for path in paths_to_segments])
-        spectrums = np.array([np.array(np.fft.fft(signal).real[:self.signal_length], dtype=np.float32) for signal in signals], dtype=np.float32)
+        signals = np.array([pd.read_parquet(path)['data'] / float(10 ** 9) for path in paths_to_segments])
         
         concated_signals = torch.tensor(np.concatenate([signals], axis=0)).view(8, self.signal_length)
-        concated_spectrums = torch.tensor(np.concatenate([spectrums], axis=0)).view(8, self.signal_length)
         
-        item = torch.cat([concated_signals.unsqueeze(0), concated_spectrums.unsqueeze(0)], dim=0).view(16, self.signal_length)
+        item = torch.cat([concated_signals.unsqueeze(0)], dim=0).view(8, self.signal_length)
         item = torch.transpose(item, 0, 1)
         
         # Return the concatenated array as the sample item and its label
