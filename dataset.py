@@ -8,6 +8,7 @@ import torch
 from torch.utils.data import Dataset
 
 
+
 class EpilepsyDataset(Dataset):
     """
     Dataset class for handling epileptic data.
@@ -49,6 +50,20 @@ class EpilepsyDataset(Dataset):
         """
         return len(self._annotation_file)
     
+    @staticmethod
+    def get_spectrum(signal):
+        # Compute FFT
+        fft_vals = np.fft.fft(signal)
+
+        # Compute magnitude and phase
+        magnitude = np.abs(fft_vals)
+        phase = np.angle(fft_vals)
+
+        # Create a matrix with signal, magnitude and phase as rows
+        matrix = np.vstack([signal, magnitude, phase])
+
+        return matrix
+    
     def __getitem__(self, idx):
         """
         Gets the data for a given index.
@@ -69,10 +84,15 @@ class EpilepsyDataset(Dataset):
                                       signal, segment_id]) + '.parquet' for signal in self._signals_names]
         signals = np.array([pd.read_parquet(path)['data'] / float(10 ** 9) for path in paths_to_segments])
         
-        concated_signals = torch.tensor(np.concatenate([signals], axis=0)).view(8, self.signal_length)
-        
-        item = torch.cat([concated_signals.unsqueeze(0)], dim=0).view(8, self.signal_length)
+        # Compute the spectrum for each signal and concatenate them
+        spectrums = np.array([get_spectrum(signal) for signal in signals])
+
+        # Concatenate the signals and their spectrums
+        concated_signals_spectrums = np.concatenate([signals, spectrums], axis=0)
+
+        # Convert to torch tensor and reshape
+        item = torch.tensor(concated_signals_spectrums).view(-1, self.signal_length)
         item = torch.transpose(item, 0, 1)
-        
+
         # Return the concatenated array as the sample item and its label
         return item, label
