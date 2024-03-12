@@ -39,7 +39,7 @@ class DatasetFormatter:
         self.segment_time = segment_time
         self.path_to_save = path_to_save
         self.path = path_to_dataset
-        self.folders_with_patients = [os.listdir(self.path)[0]]
+        self.folders_with_patients = os.listdir(self.path)
         self.path_to_save_normalization = path_to_save_normalization
         self.verbose = verbose
         self.frequency = frequency
@@ -264,7 +264,7 @@ class DatasetFormatter:
             part['data'] = (part['data'] - mean) / std_dev
             part.to_parquet(os.path.join(self.path_to_save_normalization, full_path), index=False)
             
-    def noise_data_augmentation(self, path_to_data, path_to_labels, labels_to_augment):
+    def noise_data_augmentation(self, path_to_data, path_to_labels, path_to_newlabels, labels_to_augment):
 
         # Load the label.csv file
         df_label = pd.read_csv(path_to_labels)
@@ -275,11 +275,11 @@ class DatasetFormatter:
         max_segment = df_label['Segment'].max()
         columns = ['Patient', 'Segment', 'Label']
         # Iterate over the filtered dataframe
-        for index, row in df_label_1.iterrows():
+        for index, row in tqdm(df_label_1.iterrows(), total=len(df_label_1), desc= 'Data noise augmentation'):
             segment = row['Segment']
             patient = row['Patient']
 
-            pattern = re.compile(f"{patient}.*_{i}\.parquet$")
+            pattern = re.compile(f"{patient}.*_{index}\.parquet$")
             files = [f for f in glob.glob(f"{path_to_data}/{patient}*.parquet") if pattern.search(f)]
             for file in files:
                 df_signal = pd.read_parquet(os.path.join(file))
@@ -310,13 +310,11 @@ class DatasetFormatter:
 
                 df_label = pd.concat([df_label, pd.DataFrame(new_row)], ignore_index=True)    
         # Save the updated label.csv file
-        df_label.to_csv(path_to_labels, index=False)
+        df_label.to_csv(path_to_newlabels, index=False)
 
-    def balance_by_downsaple(self, path_to_labels, path_to_save_balanced_labels, new_labels_file_name, ration, cap):
+    def balance_by_downsaple(self, path_to_labels, path_to_save_balanced_labels, new_labels_file_name, ration):
         # Load the dataset
         df = pd.read_csv(path_to_labels)
-
-        df = df[df['Segment'] <= cap]
         
         # Check the class distribution
         print(df['Label'].value_counts())
