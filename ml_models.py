@@ -114,7 +114,7 @@ class MachineLearning():
         '''
         train Knn
         '''
-        model = KNeighborsClassifier(n_neighbors = 100)
+        model = KNeighborsClassifier(n_neighbors=40, weights='distance',metric='manhattan', n_jobs=-1)
         
         model.fit(self.X_train, self.y_train)
         y_train_preds = model.predict_proba(self.X_train)[:,1]
@@ -130,7 +130,9 @@ class MachineLearning():
         '''
         train XGB
         '''
-        xgbc = XGBClassifier()
+        xgbc = XGBClassifier(booster="gbtree", max_depth=3,
+                             objective = 'binary:logistic', device = 'cuda',
+                             eval_metric = "auc", colsample_bytree = 0.78)
         
         xgbc.fit(self.X_train, self.y_train)
         y_train_preds = xgbc.predict_proba(self.X_train)[:,1]
