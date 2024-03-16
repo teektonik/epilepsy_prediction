@@ -258,14 +258,21 @@ class DatasetFormatter:
 
         # Get the maximum segment index in the existing label.csv file
         max_segment = df_label['Segment'].max()
-        columns = ['Patient', 'Segment', 'Label']
-        # Iterate over the filtered dataframe
+        columns = ['Patient', 'Segment', 'Label', 'Files']
+        
+        max_segments = df_label.groupby('Patient')['Segment'].max()
+
         for index, row in tqdm(df_label_1.iterrows(), total=len(df_label_1), desc= 'Data noise augmentation'):
             segment = row['Segment']
             patient = row['Patient']
-
-            pattern = re.compile(f"{patient}.*_{index}\.parquet$")
+            pattern = re.compile(f"{patient}.*_{segment}\.parquet$")
             files = [f for f in glob.glob(f"{path_to_data}/{patient}*.parquet") if pattern.search(f)]
+            #if(patient == 'MSEL_00501'):
+                #print(files)
+            max_segments[patient] += 1
+            existing_files = ''
+            #print(files)
+            #print(len(files))
             for file in files:
                 df_signal = pd.read_parquet(os.path.join(file))
 
@@ -273,27 +280,25 @@ class DatasetFormatter:
                 noise = np.random.normal(0, 1, df_signal.shape)
                 df_signal_noisy = df_signal + noise
 
-                # Increment the maximum segment index
-                max_segment += 1
                 # Create new file name with new segment in it
                 parts = file.split('/')
                 last_part = parts[-1]
                 sub_parts = last_part.split('_')
                 last_sub_part = sub_parts[-1]
                 final_parts = last_sub_part.split('.')
-                final_parts[0] = str(max_segment)
+                final_parts[0] = str(max_segments[patient])
                 last_sub_part = '.'.join(final_parts)
                 sub_parts[-1] = last_sub_part
                 last_part = '_'.join(sub_parts)
                 parts[-1] = last_part
                 new_file= '/'.join(parts)
-                
                 # Save the noisy signal data to a new parquet file with the new index
                 df_signal_noisy.to_parquet(new_file, index=False)
+                existing_files += ', ' + new_file
 
-                new_row = pd.DataFrame([[patient, max_segment, labels_to_augment]], columns=columns)
+            new_row = pd.DataFrame([[patient, max_segments[patient], labels_to_augment, existing_files]], columns=columns)
 
-                df_label = pd.concat([df_label, pd.DataFrame(new_row)], ignore_index=True)    
+            df_label = pd.concat([df_label, pd.DataFrame(new_row)], ignore_index=True)    
         # Save the updated label.csv file
         df_label.to_csv(path_to_newlabels, index=False)
 
