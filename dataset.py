@@ -39,6 +39,41 @@ class EpilepsyDataset(Dataset):
 
         num_samples_to_keep = min(len(class_0), len(class_1))
         self._annotation_file = pd.concat([class_0.sample(num_samples_to_keep, random_state=42), class_1], axis=0)
+
+    @staticmethod    
+    def _get_acc_sqi(acc_x, acc_y, acc_z, sampling_rate=128):
+        acc_data = np.sqrt((acc_x * acc_x + acc_y * acc_y + acc_z * acc_z) / 3.0)
+        
+        segment_length = 4  
+        segment_samples = segment_length * sampling_rate  
+        num_segments = len(acc_data) // segment_samples  
+        
+        narrowband_powers = []
+        broadband_powers = []
+    
+        for i in range(num_segments):
+            segment_start = i * segment_samples
+            segment_end = (i + 1) * segment_samples
+
+            segment_data = acc_data[segment_start:segment_end]
+
+            f_acc, Pxx_acc = periodogram(segment_data, fs=sampling_rate)
+
+            idx_08hz = np.argmax(f_acc >= 0.8)
+            idx_5hz = np.argmax(f_acc >= 5.0)
+
+            narrowband_power = np.mean(Pxx_acc[idx_08hz:idx_5hz + 1])
+            broadband_power = np.mean(Pxx_acc[idx_08hz:])
+
+            narrowband_powers.append(narrowband_power)
+            broadband_powers.append(broadband_power)
+    
+        avg_narrowband_power = np.mean(narrowband_powers)
+        avg_broadband_power = np.mean(broadband_powers)
+
+        signal_quality = avg_narrowband_power / avg_broadband_power
+ 
+        return signal_quality
         
     def __len__(self):
         """
