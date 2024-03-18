@@ -107,8 +107,8 @@ class EpilepsyDataset(Dataset):
         signals = np.array([x['data'] / float(10 ** 9) for x in files])
         
         ms_in_hour = 3_600_000
-        encoded_hours = ((files[0]['time'][0] / ms_in_hour) % 24) / 24
-        encoded_hours = torch.tensor([encoded_hours] * self.signal_length, dtype=torch.float32)
+        encoded_hours = torch.tensor([(((x / ms_in_hour) % 24) / 24) for x in files[0]['time']]) \
+                                                                .reshape(1, self.signal_length)
         
         concated_signals = torch.tensor(np.concatenate([signals, encoded_hours.reshape(1, len(encoded_hours))], axis=0)) \
                                                                 .view(len(self._signals_names) + 1, self.signal_length)
