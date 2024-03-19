@@ -60,7 +60,7 @@ class EpilepsyDataset(Dataset):
         phase = np.angle(fft_vals)
 
         # Create a matrix with signal, magnitude and phase as rows
-        matrix = np.vstack([signal, magnitude, phase])
+        matrix = np.vstack([magnitude, phase])
 
         return matrix
     
@@ -85,14 +85,15 @@ class EpilepsyDataset(Dataset):
         signals = np.array([pd.read_parquet(path)['data'] / float(10 ** 9) for path in paths_to_segments])
         
         # Compute the spectrum for each signal and concatenate them
-        spectrums = np.array([get_spectrum(signal) for signal in signals])
-
+        spectrums = np.array([self.get_spectrum(signal) for signal in signals])
+        spectrums = torch.tensor(spectrums).view(-1, self.signal_length)
         # Concatenate the signals and their spectrums
         concated_signals_spectrums = np.concatenate([signals, spectrums], axis=0)
 
         # Convert to torch tensor and reshape
         item = torch.tensor(concated_signals_spectrums).view(-1, self.signal_length)
         item = torch.transpose(item, 0, 1)
-
+        item = item.float()
+        #print(item)
         # Return the concatenated array as the sample item and its label
         return item, label
