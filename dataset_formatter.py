@@ -240,12 +240,16 @@ class DatasetFormatter:
         """
         Take .parquet files normilize them with simple algorithm
         """
-        parquet_files =os.listdir(self.path_to_save)
+        parquet_files = os.listdir(self.path_to_save)
 
         for full_path in tqdm(parquet_files):
             part = pd.read_parquet(os.path.join(self.path_to_save, full_path))
             mean = part['data'].mean()
             std_dev = part['data'].std()
+            if std_dev == 0:
+                #print(f"All values are the same for {full_path}. Skipping normalization.")
+                part.to_parquet(os.path.join(self.path_to_save_normalization, full_path), index=False)
+                continue
             part['data'] = (part['data'] - mean) / std_dev
             part.to_parquet(os.path.join(self.path_to_save_normalization, full_path), index=False)
             
@@ -324,6 +328,6 @@ class DatasetFormatter:
 
         # Display new class counts
         print(df_downsampled.Label.value_counts())
-
+        
         # Save the new downsampled dataset
         df_downsampled.to_csv(os.path.join(path_to_save_balanced_labels, new_labels_file_name), index=False)
