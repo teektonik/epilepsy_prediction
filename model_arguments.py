@@ -5,7 +5,11 @@ class ModelArguments:
                  path_to_data: str, 
                  path_to_annotation: str, 
                  signals_names: list[str], 
-                 use_spectrum: bool = False
+                 use_spectrum: bool=False,
+                 use_class_balance: bool=True,
+                 window_size: int=4,
+                 sample_rate: int=128,
+                 use_raw_data: bool=False
                 ):
         """
         Initializes the ModelsArguments with the given parameters.
@@ -20,6 +24,10 @@ class ModelArguments:
         self._path_to_annotation = path_to_annotation
         self._signals_names = signals_names
         self._use_spectrum = use_spectrum
+        self._use_class_balance = use_class_balance
+        self._window_size = window_size
+        self._sample_rate = sample_rate
+        self._use_raw_data = use_raw_data
         
     @property    
     def path_to_data(self) -> str:
@@ -115,6 +123,106 @@ class ModelArguments:
         Returns:
         - int: Total number of channels.
         """
-        return len(self.signals_names) * 2 + 1 \
+        number_of_channels = len(self.signals_names) * 2 + 1 \
                 if self.use_spectrum else len(self.signals_names) + 1
+        
+        if self.use_raw_data is False:
+            number_of_channels = number_of_channels * 2 - 1
+            
+        return number_of_channels
+    
+    @property    
+    def use_class_balance(self) -> int:
+        """
+        Get the flag indicating whether to use class balance.
+
+        Returns:
+        - int: Flag indicating whether to use class balance.
+        """
+        return self._use_class_balance
+    
+    @use_class_balance.setter
+    def use_class_balance(self, use_balancing: bool) -> None:
+        """
+        Set the flag indicating whether to use class balance.
+
+        Parameters:
+        - use_balancing (bool): Flag indicating whether to use class balance.
+        """
+        self._use_class_balance = use_balancing
+        
+    @property    
+    def sample_rate(self) -> int:
+        """
+        Get the sample rate.
+
+        Returns:
+        - int: Sample rate.
+        """
+        return self._sample_rate
+    
+    @sample_rate.setter
+    def sample_rate(self, sample_rate: bool) -> None:
+        """
+        Set the sample rate.
+
+        Parameters:
+        - sample_rate (bool): Sample rate.
+        """
+        if sample_rate <= 0:
+            raise Exception('Sample rate should be a positive number')
+        self._sample_rate = sample_rate
+                             
+    @property    
+    def window_size(self) -> int:
+        """
+        Get the window size.
+
+        Returns:
+        - int: Window size.
+        """
+        return self._window_size
+    
+    @window_size.setter
+    def window_size(self, window_size: int) -> None:
+        """
+        Set the window size.
+
+        Parameters:
+        - window_size (int): Window size.
+        """
+        if window_size <= 0:
+            raise Exception('Window_size should be a positive number')
+        self._window_size = window_size
+                             
+    @property    
+    def window_size_in_elements(self) -> int:
+        """
+        Get the window size in elements.
+
+        Returns:
+        - int: Window size in elements.
+        """
+        return self._window_size * self._sample_rate
+    
+    @property    
+    def use_raw_data(self) -> int:
+        """
+        Get the flag indicating whether to use raw data.
+
+        Returns:
+        - int: Flag indicating whether to use raw data.
+        """
+        return self._use_raw_data
+    
+    @use_raw_data.setter
+    def use_raw_data(self, use_raw_data: bool) -> None:
+        """
+        Set the flag indicating whether to use raw data.
+
+        Parameters:
+        - use_raw_data (bool): Flag indicating whether to use raw data.
+        """
+        self._use_raw_data = use_raw_data
+
 
