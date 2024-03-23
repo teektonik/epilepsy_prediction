@@ -3,6 +3,8 @@
 import os
 import numpy as np
 import pandas as pd
+from scipy.signal import periodogram
+from mne.time_frequency import psd_array_multitaper
 
 import torch
 from torch.utils.data import Dataset
@@ -39,7 +41,18 @@ class EpilepsyDataset(Dataset):
 
         num_samples_to_keep = min(len(class_0), len(class_1))
         self._annotation_file = pd.concat([class_0.sample(num_samples_to_keep, random_state=42), class_1], axis=0)
-
+    
+    @staticmethod 
+    def _normalize_list_of_arrays(list_of_arrays):
+        def normalize_array(array):
+            array_min = np.min(array)
+            array_max = np.max(array)
+            normalized_array = (array - array_min) / (array_max - array_min)
+            return normalized_array
+        
+        normalized_list = [normalize_array(array) for array in list_of_arrays]
+        return normalized_list
+        
     @staticmethod    
     def _get_acc_sqi(acc_x, acc_y, acc_z, sampling_rate=128):
         acc_data = np.sqrt((acc_x * acc_x + acc_y * acc_y + acc_z * acc_z) / 3.0)
@@ -74,7 +87,20 @@ class EpilepsyDataset(Dataset):
         signal_quality = avg_narrowband_power / avg_broadband_power
  
         return signal_quality
-        
+
+    @staticmethod
+    def _get_signal_power(signal, sample_rate=128):
+        power = np.power(np.abs(np.fft.fft(signal)), 2)
+        return power.astype(float)
+    
+    @staticmethod
+    def _get_spectral_features(freq_domain_data, sample_rate=128):
+        return freq_domain_data.mean(), freq_domain_data.std()
+    
+    @staticmethod
+    def _get_time_features(time_domain_data, sample_rate=128):
+        return time_domain_data.mean(), time_domain_data.std()
+    
     def __len__(self):
         """
         Returns the total number of samples in the dataset.
@@ -104,17 +130,21 @@ class EpilepsyDataset(Dataset):
                                       signal, segment_id]) + '.parquet' for signal in self._signals_names]
         
         files = [pd.read_parquet(path) for path in paths_to_segments]
-        signals = np.array([x['data'] / float(10 ** 9) for x in files])
+        signals = torch.tensor([x['data'] / float(10 ** 9) for x in files])
         
         ms_in_hour = 3_600_000
-        encoded_hours = torch.tensor([(((x / ms_in_hour) % 24) / 24) for x in files[0]['time']]) \
+        encoded_hours = torch.tensor(np.array([(((x / ms_in_hour) % 24) / 24) for x in files[0]['time']]), dtype=torch.float32) \
                                                                 .reshape(1, self.signal_length)
         
-        concated_signals = torch.tensor(np.concatenate([signals, encoded_hours.reshape(1, len(encoded_hours))], axis=0)) \
-                                                                .view(len(self._signals_names) + 1, self.signal_length)
+        powers = torch.tensor(np.array([EpilepsyDataset._get_signal_power(x) for x in signals]), dtype=torch.float32) \
+                                                                .view(len(self._signals_names), self.signal_length)
         
-        item = torch.cat([concated_signals.unsqueeze(0)], dim=0).view(len(self._signals_names) + 1, self.signal_length)
-        item = torch.transpose(item, 0, 1)
+        number_of_channles = signals.shape[0] + encoded_hours.shape[0] + powers.shape[0] 
+        
+        concated_signals = torch.tensor(np.concatenate([signals, power, encoded_hours], axis=0)) \
+                                                                .view(number_of_channles, self.signal_length)
+        
+        item = torch.transpose(concated_signals, 0, 1)
         
         # Return the concatenated array as the sample item and its label
         return item, label
