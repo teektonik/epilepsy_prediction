@@ -16,6 +16,9 @@ from model_arguments import ModelArguments
 
 
 class BaseDataset(Dataset):
+    """
+    A base class containing common code for others
+    """
     def __init__(
         self, 
         args: ModelArguments
@@ -43,7 +46,19 @@ class BaseDataset(Dataset):
                 [class_0.sample(num_samples_to_keep, random_state=42), class_1], axis=0)
 
     @staticmethod
-    def _apply_lowpass_filter(data, cutoff_frequency, fs, order=5):
+    def _apply_lowpass_filter(data: np.array, cutoff_frequency: int, fs: int, order: int=5) -> np.array:
+        """
+        Apply a lowpass filter to the data.
+
+        Parameters:
+        - data: The input signal.
+        - cutoff_frequency: The cutoff frequency of the filter.
+        - fs: The sampling frequency of the data.
+        - order (int): The order of the filter (default: 5).
+
+        Returns:
+        - filtered_data: The filtered signal.
+        """
         nyq = 0.5 * fs
         normal_cutoff = cutoff_frequency / nyq
         b, a = butter(order, normal_cutoff, btype='low', analog=False)
@@ -229,7 +244,7 @@ class RawEpilepsyDataset(BaseDataset):
     
 class EpilepsyDataset(BaseDataset):
     """
-    Dataset class for handling epileptic data.
+    Dataset class for handling epileptic data with extracted features.
     """
 
     def __init__(
@@ -246,7 +261,7 @@ class EpilepsyDataset(BaseDataset):
         self.args = args
         
     @staticmethod
-    def _get_statistics(time_domain_data: np.array, window_size_in_elements: int):
+    def _get_statistics(time_domain_data: np.array, window_size_in_elements: int) -> tuple:
         """
         Calculate statistical features from time domain data.
 
@@ -267,9 +282,8 @@ class EpilepsyDataset(BaseDataset):
         return mean, std, iqr
         
     @staticmethod
-    def _get_spectral_features(
-        time_domain_data: np.array, sample_rate: int = 128, window_size: int=4
-    ) -> tuple:
+    def _get_spectral_features(time_domain_data: np.array, sample_rate: int = 128, window_size: int=4
+) -> tuple:
         """
         Calculate spectral features from frequency domain data.
 
