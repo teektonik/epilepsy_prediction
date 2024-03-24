@@ -3,11 +3,15 @@
 import os
 import numpy as np
 import pandas as pd
+import scipy
 from scipy.signal import periodogram
+from scipy.stats import iqr
 from mne.time_frequency import psd_array_multitaper
+from scipy.signal import butter, filtfilt
 
 import torch
 from torch.utils.data import Dataset
+
 from model_arguments import ModelArguments
 
 
@@ -37,6 +41,15 @@ class BaseDataset(Dataset):
             num_samples_to_keep = min(len(class_0), len(class_1))
             self._annotation_file = pd.concat(
                 [class_0.sample(num_samples_to_keep, random_state=42), class_1], axis=0)
+
+    @staticmethod
+    def _apply_lowpass_filter(data, cutoff_frequency, fs, order=5):
+        nyq = 0.5 * fs
+        normal_cutoff = cutoff_frequency / nyq
+        b, a = butter(order, normal_cutoff, btype='low', analog=False)
+        filtered_data = filtfilt(b, a, data)
+        
+        return filtered_data
         
     def __len__(self) -> int:
         """
@@ -233,6 +246,27 @@ class EpilepsyDataset(BaseDataset):
         self.args = args
         
     @staticmethod
+    def _get_statistics(time_domain_data: np.array, window_size_in_elements: int):
+        """
+        Calculate statistical features from time domain data.
+
+        Parameters:
+        - time_domain_data (np.array): Data in the time domain.
+        - window_size_in_elements (int): Size of the window in elements.
+
+        Returns:
+        - tuple: Mean, standard deviation and interquartile range of the data.
+        """
+        number_of_windows = int(len(time_domain_data) / window_size_in_elements)
+        windows = np.array_split(time_domain_data, number_of_windows)
+        
+        mean = np.mean(windows, axis=1).reshape(1, number_of_windows)
+        std = np.std(windows, axis=1).reshape(1, number_of_windows)
+        iqr =  scipy.stats.iqr(windows, axis=1).reshape(1, number_of_windows)
+
+        return mean, std, iqr
+        
+    @staticmethod
     def _get_spectral_features(
         time_domain_data: np.array, sample_rate: int = 128, window_size: int=4
     ) -> tuple:
@@ -240,23 +274,18 @@ class EpilepsyDataset(BaseDataset):
         Calculate spectral features from frequency domain data.
 
         Parameters:
-        - freq_domain_data (np.array): Data in the frequency domain.
+        - time_domain_data (np.array): Data in the time domain.
         - sample_rate (int): Sampling rate of the data.
         - window_size (int): Size of the window.
 
         Returns:
-        - tuple: Mean and standard deviation of the data.
+        - tuple: Mean, standard deviation and iqr of the data.
         """
         spectrum = np.fft.fft(time_domain_data)
+        spectrum = BaseDataset._apply_lowpass_filter(spectrum, 50, 128)
         power = np.power(np.abs(spectrum), 2)
-        
-        number_of_windows = int(len(power) / (sample_rate * window_size))
-        windows = np.array_split(power, number_of_windows)
-        
-        mean = np.mean(windows, axis=1).reshape(1, number_of_windows)
-        std = np.std(windows, axis=1).reshape(1, number_of_windows)
-        
-        return mean, std
+    
+        return EpilepsyDataset._get_statistics(power, sample_rate * window_size)
 
     @staticmethod
     def _get_time_features(time_domain_data: np.array, sample_rate: int = 128, window_size: int=4) -> tuple:
@@ -269,16 +298,10 @@ class EpilepsyDataset(BaseDataset):
         - window_size (int): Size of the window.
 
         Returns:
-        - tuple: Mean and standard deviation of the data.
+        - tuple: Mean, standard deviation and iqr of the data.
         """
         
-        number_of_windows = int(len(time_domain_data) / (sample_rate * window_size))
-        windows = np.array_split(time_domain_data, number_of_windows)
-        
-        mean = np.mean(windows, axis=1).reshape(1, number_of_windows)
-        std = np.std(windows, axis=1).reshape(1, number_of_windows)
-        
-        return mean, std
+        return EpilepsyDataset._get_statistics(time_domain_data, sample_rate * window_size)
     
     @staticmethod
     def _get_encoded_time(
