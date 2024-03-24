@@ -52,6 +52,15 @@ class EpilepsyDataset(Dataset):
     
     @staticmethod
     def get_spectrum(signal):
+        """
+        Calculate the spectrum of a signal.
+
+        Parameters:
+        - signal (np.array): Input signal.
+        
+        Returns:
+        - np.array: matrix of concated magnitude and phase 
+        """
         # Compute FFT
         fft_vals = np.fft.fft(signal)
 
@@ -63,6 +72,20 @@ class EpilepsyDataset(Dataset):
         matrix = np.vstack([magnitude, phase])
 
         return matrix
+    @staticmethod
+    def _get_signal_power(signal: np.array, sample_rate: int = 128) -> np.array:
+        """
+        Calculate the power spectrum of a signal.
+
+        Parameters:
+        - signal (np.array): Input signal.
+        - sample_rate (int): Sampling rate of the signal.
+
+        Returns:
+        - np.array: Power spectrum of the signal.
+        """
+        power = np.power(np.abs(np.fft.fft(signal)), 2)
+        return power.astype(float)
     
     def __getitem__(self, idx):
         """
@@ -82,13 +105,42 @@ class EpilepsyDataset(Dataset):
         
         paths_to_segments = ['_'.join([os.path.join(self._path_to_data, patient_name), 
                                       signal, segment_id]) + '.parquet' for signal in self._signals_names]
+        files = [pd.read_parquet(path) for path in paths_to_segments]
+        
         signals = np.array([pd.read_parquet(path)['data'] / float(10 ** 9) for path in paths_to_segments])
+        for signal in signals:
+            mean = signal.mean()
+            std_dev = signal.std()
+            if std_dev == 0:
+                continue
+            signal = (signal - mean) / std_dev
+        chance = 0.5
+        for signal in signals:
+            rand = np.random.rand()
+            if rand < chance:
+                median_val = np.median(signal)
+
+                noise = np.random.normal(0, abs(median_val), len(signal))
+                signal = signal + noise
+        
+        signal_length = len(signals[0])
+
+        ms_in_hour = 3_600_000
+        encoded_hours = torch.tensor(
+            np.array([(((x / ms_in_hour) % 24) / 24) for x in files[0]["time"]]),
+            dtype=torch.float32,
+        ).view(-1, self.signal_length)
+
+        powers = torch.tensor(
+            np.array([EpilepsyDataset._get_signal_power(x) for x in signals]),
+            dtype=torch.float32,
+        ).view(-1, self.signal_length)
         
         # Compute the spectrum for each signal and concatenate them
         spectrums = np.array([self.get_spectrum(signal) for signal in signals])
         spectrums = torch.tensor(spectrums).view(-1, self.signal_length)
         # Concatenate the signals and their spectrums
-        concated_signals_spectrums = np.concatenate([signals, spectrums], axis=0)
+        concated_signals_spectrums = np.concatenate([signals, spectrums, encoded_hours], axis=0)
 
         # Convert to torch tensor and reshape
         item = torch.tensor(concated_signals_spectrums).view(-1, self.signal_length)
