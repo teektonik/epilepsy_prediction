@@ -9,7 +9,8 @@ class ModelArguments:
                  use_class_balance: bool=True,
                  window_size: int=4,
                  sample_rate: int=128,
-                 use_raw_data: bool=False
+                 use_raw_data: bool=False,
+                 number_of_extracting_features: int=3,
                 ):
         """
         Initializes the ModelsArguments with the given parameters.
@@ -28,6 +29,7 @@ class ModelArguments:
         self._window_size = window_size
         self._sample_rate = sample_rate
         self._use_raw_data = use_raw_data
+        self._number_of_extracting_features = number_of_extracting_features
         
     @property    
     def path_to_data(self) -> str:
@@ -116,6 +118,28 @@ class ModelArguments:
         self._signals_names = signals_names
         
     @property    
+    def number_of_extracting_features(self) -> int:
+        """
+        Get the number of extracting features.
+
+        Returns:
+        - int: Number of extracting features.
+        """
+        return self._number_of_extracting_features
+    
+    @number_of_extracting_features.setter
+    def number_of_extracting_features(self, number: int) -> None:
+        """
+        Set the  number of extracting features.
+
+        Parameters:
+        - number (int): Flag indicating whether to use raw data.
+        """
+        if number <= 0:
+            raise Exception('Number of featured should be greater than 0')
+        self._number_of_extracting_features = number
+        
+    @property    
     def number_of_channels(self) -> int:
         """
         Get the total number of channels (including time).
@@ -123,12 +147,15 @@ class ModelArguments:
         Returns:
         - int: Total number of channels.
         """
-        number_of_channels = len(self.signals_names) * 2 + 1 \
-                if self.use_spectrum else len(self.signals_names) + 1
+        number_of_channels = len(self.signals_names) * 2 \
+                if self.use_spectrum else len(self.signals_names)
         
         if self.use_raw_data is False:
-            number_of_channels = number_of_channels * 2 - 1
+            number_of_channels = number_of_channels * self.number_of_extracting_features
             
+        # A channel with time    
+        number_of_channels += 1
+ 
         return number_of_channels
     
     @property    
@@ -224,5 +251,6 @@ class ModelArguments:
         - use_raw_data (bool): Flag indicating whether to use raw data.
         """
         self._use_raw_data = use_raw_data
+        
 
 
