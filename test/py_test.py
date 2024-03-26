@@ -4,15 +4,17 @@ import os
 import numpy as np
 
 def files(dataframe, idx: int):
-     """
-     Function to process files based on the given index
-     Extracting necessary data from the dataframe
-     """
+    """
+    Function to process files based on the given index
+    Extracting necessary data from the dataframe
+    """
+    
     data_row = dataframe.iloc[idx]
     path_to_data = '/workspace/new_data/'
     patient_name = data_row['Patient']
     segment_id = str(data_row['Segment'])
     signals_names = ['Acc x', 'Acc y', 'Acc z', 'Acc Mag', 'EDA', 'BVP', 'TEMP', 'HR']
+    
     # Constructing paths to segments based on patient name, signal, and segment ID
     paths_to_segments = [
         "_".join(
