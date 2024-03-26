@@ -17,7 +17,9 @@ class EpilepsyDataset(Dataset):
                  path_to_annotation_file: str, 
                  path_to_data: str, 
                  signals_names: list[str], 
-                 signal_lenght: int):
+                 signal_lenght: int,
+                 normalization_trigger: bool,
+                 noise_augmentation_trigger: bool):
         """
         Initializes the EpilepsyDataset with the given parameters.
 
@@ -33,7 +35,8 @@ class EpilepsyDataset(Dataset):
         self._annotation_file = pd.read_csv(self._path_to_annotation_file)
         self._signals_names = signals_names
         self.signal_length = signal_lenght
-    
+        self.normalization_trigger = normalization_trigger
+        self.noise_augmentation_trigger = noise_augmentation_trigger
         # Class balancing
         class_0 = self._annotation_file[self._annotation_file['Label'] == 0]
         class_1 = self._annotation_file[self._annotation_file['Label'] == 1]
@@ -108,20 +111,24 @@ class EpilepsyDataset(Dataset):
         files = [pd.read_parquet(path) for path in paths_to_segments]
         
         signals = np.array([pd.read_parquet(path)['data'] / float(10 ** 9) for path in paths_to_segments])
-        for signal in signals:
-            mean = signal.mean()
-            std_dev = signal.std()
-            if std_dev == 0:
-                continue
-            signal = (signal - mean) / std_dev
-        chance = 0.5
-        for signal in signals:
-            rand = np.random.rand()
-            if rand < chance:
-                median_val = np.median(signal)
+        
+        if self.normalization_trigger:
+            for signal in signals:
+                mean = signal.mean()
+                std_dev = signal.std()
+                if std_dev == 0:
+                    continue
+                signal = (signal - mean) / std_dev
+                
+        if self.noise_augmentation_trigger:
+            chance = 0.5
+            for signal in signals:
+                rand = np.random.rand()
+                if rand < chance:
+                    median_val = np.median(signal)
 
-                noise = np.random.normal(0, abs(median_val), len(signal))
-                signal = signal + noise
+                    noise = np.random.normal(0, abs(median_val), len(signal))
+                    signal = signal + noise
         
         signal_length = len(signals[0])
 
