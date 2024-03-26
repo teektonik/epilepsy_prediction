@@ -75,6 +75,42 @@ class BaseDataset(Dataset):
         """
         return len(self._annotation_file)
     
+    @staticmethod
+    def _signal_normalization(signal):
+        """
+        Simpe normalization of input signal.
+
+        Parameters:
+        - signal (np.array): Input signal.
+        
+        Returns:
+        - norm_signal (np.array): normalized signal.
+        """
+        mean = signal.mean()
+        std_dev = signal.std()
+        if std_dev == 0:
+            return signal
+        norm_signal = (signal - mean) / std_dev
+        
+        return norm_signal
+        
+    @staticmethod
+    def _signal_noise_augmentation(signal):
+        """
+        Simpe normalization of input signal. 
+
+        Parameters:
+        - signal (np.array): Input signal.
+        
+        Returns:
+        - noise_signal(np.array): signal with added noise. 
+        """
+        median_val = np.median(signal)
+
+        noise = np.random.normal(0, abs(median_val), len(signal))
+        noise_signal = signal + noise
+        return noise_signal
+      
     def __getitem__(self, idx: int) -> tuple:
         """
         Gets the data for a given index.
@@ -103,29 +139,15 @@ class BaseDataset(Dataset):
         signals = [x['data'] / float(10 ** 9) for x in files]
         time = [x['time'] for x in files]
         
+        if self.args.normalization_trigger:
+            signals = [EpilepsyDataset._signal_normalization(signal) for signal in signals]
+            
+        if self.args.noise_augmentation_trigger:
+            signals = [EpilepsyDataset._signal_noise_augmentation(signal) if np.random.rand() < self.args.noise_chance_augmentation else signal
+                       for signal in signals]
+            
+        signals = [signal.astype(np.float32) for signal in signals]
         return signals, time, label
-
-    @staticmethod
-    def _normalize_list_of_arrays(list_of_arrays: list[np.array]) -> list[np.array]:
-        """
-        Normalize a list of arrays.
-
-        Parameters:
-        - list_of_arrays (list[np.array]): List of arrays to normalize.
-
-        Returns:
-        - list[np.array]: List of normalized arrays.
-        """
-
-        def normalize_array(array):
-            array_min = np.min(array)
-            array_max = np.max(array)
-            normalized_array = (array - array_min) / (array_max - array_min)
-            return normalized_array
-
-        normalized_list = [normalize_array(array) for array in list_of_arrays]
-        return normalized_list
-
 
 class RawEpilepsyDataset(BaseDataset):
     """
@@ -208,6 +230,24 @@ class RawEpilepsyDataset(BaseDataset):
         """
         power = np.power(np.abs(np.fft.fft(signal)), 2)
         return power.astype(float)
+    
+    @staticmethod
+    def _get_spectrum(signal):
+        """
+        Calculate the spectrum of a signal and save it as matrix of magnitude and phase.
+
+        Parameters:
+        - signal (np.array): Input signal.
+        
+        Returns:
+        - np.array: matrix of concated magnitude and phase.
+        """
+        fft_vals = np.fft.fft(signal)
+        magnitude = np.abs(fft_vals)
+        phase = np.angle(fft_vals)
+        matrix = np.vstack([magnitude, phase])
+
+        return matrix
 
     def __getitem__(self, idx: int) -> tuple:
         """
@@ -227,20 +267,30 @@ class RawEpilepsyDataset(BaseDataset):
             np.array([(((x / ms_in_hour) % 24) / 24) for x in time[0]]),
             dtype=torch.float32,
         ).reshape(1, signal_length)
+        
+        
+#         powers = torch.tensor(
+#             np.array([RawEpilepsyDataset._get_signal_power(x) for x in signals]),
+#             dtype=torch.float32,
+#         ).view(len(self._signals_names), signal_length)
 
-        powers = torch.tensor(
-            np.array([RawEpilepsyDataset._get_signal_power(x) for x in signals]),
-            dtype=torch.float32,
-        ).view(len(self._signals_names), signal_length)
-
-        concatenated_signals = torch.tensor(
-            np.concatenate([signals, powers, encoded_hours], axis=0)
-        ).view(self._number_of_features, signal_length)
+        spectrums = torch.tensor(
+            np.array([self._get_spectrum(signal) for signal in signals]), 
+            dtype=torch.float32
+        ).view(-1, signal_length)
+        
+        if self.args._use_spectrum:
+            concatenated_signals = torch.tensor(
+                np.concatenate([signals, encoded_hours, spectrums], axis=0)
+            ).view(self._number_of_features, signal_length)
+        else:
+            concatenated_signals = torch.tensor(
+                np.concatenate([signals, encoded_hours], axis=0)
+            ).view(self._number_of_features, signal_length)
 
         item = torch.transpose(concatenated_signals, 0, 1)
 
         return item, label
-    
     
 class EpilepsyDataset(BaseDataset):
     """
@@ -344,6 +394,20 @@ class EpilepsyDataset(BaseDataset):
         ).reshape(1, number_of_windows)
 
         return encoded_hours
+    
+    @staticmethod
+    def _compute_zero_crossing_rate(signals):
+        """
+        Compute the zero-crossing rate of the signals.
+
+        Parameters:
+        - signals (np.array): The input signals.
+
+        Returns:
+        - np.array: The zero-crossing rate of the signals.
+        """
+        zero_crossings = np.sum(np.abs(np.diff(np.sign(signals), axis=1)) / 2, axis=1)
+        return zero_crossings
 
     def __getitem__(self, idx: int) -> tuple:
         """
