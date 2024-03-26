@@ -14,6 +14,7 @@ from torch.utils.data import Dataset
 
 from model_arguments import ModelArguments
 
+
 class BaseDataset(Dataset):
     """
     A base class containing common code for others
@@ -74,7 +75,6 @@ class BaseDataset(Dataset):
         """
         return len(self._annotation_file)
     
-    
     @staticmethod
     def _signal_normalization(signal):
         """
@@ -110,7 +110,7 @@ class BaseDataset(Dataset):
         noise = np.random.normal(0, abs(median_val), len(signal))
         noise_signal = signal + noise
         return noise_signal
-    
+      
     def __getitem__(self, idx: int) -> tuple:
         """
         Gets the data for a given index.
@@ -138,7 +138,6 @@ class BaseDataset(Dataset):
         
         signals = [x['data'] / float(10 ** 9) for x in files]
         time = [x['time'] for x in files]
-        
         
         if self.args.normalization_trigger:
             signals = [EpilepsyDataset._signal_normalization(signal) for signal in signals]
@@ -269,17 +268,16 @@ class RawEpilepsyDataset(BaseDataset):
             dtype=torch.float32,
         ).reshape(1, signal_length)
         
-        '''
-        powers = torch.tensor(
-            np.array([RawEpilepsyDataset._get_signal_power(x) for x in signals]),
-            dtype=torch.float32,
-        ).view(len(self._signals_names), signal_length)
+        
+#         powers = torch.tensor(
+#             np.array([RawEpilepsyDataset._get_signal_power(x) for x in signals]),
+#             dtype=torch.float32,
+#         ).view(len(self._signals_names), signal_length)
 
         spectrums = torch.tensor(
             np.array([self._get_spectrum(signal) for signal in signals]), 
             dtype=torch.float32
         ).view(-1, signal_length)
-        '''
         
         if self.args._use_spectrum:
             concatenated_signals = torch.tensor(
@@ -443,7 +441,7 @@ class EpilepsyDataset(BaseDataset):
         time_features = torch.tensor(np.concatenate(time_features_list, axis=0), dtype=torch.float32)
         frequency_features = torch.tensor(np.concatenate(frequency_features_list, axis=0), dtype=torch.float32)
         encoded_time = torch.tensor(EpilepsyDataset._get_encoded_time(time[0]), dtype=torch.float32)
-        
+
         concatenated_signals = torch.tensor(
             np.concatenate([time_features, frequency_features, encoded_time], axis=0)
         ).view(self._number_of_features, int(signal_length / self.args.window_size_in_elements))
