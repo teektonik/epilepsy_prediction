@@ -34,7 +34,7 @@ class BaselineModel(L.LightningModule):
         self.f1_score = torchmetrics.F1Score(task="binary", num_classes=2)
         self.recall = torchmetrics.Recall(task="binary", num_classes=2)
         self.precision = torchmetrics.classification.Precision(task='binary', num_classes=2)
-            
+        
     def forward(self, x):
         lstm_out, _ = self.rnn(x)
         lstm_out = lstm_out[:, -1, :]
