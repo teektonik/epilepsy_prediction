@@ -32,7 +32,7 @@ class DatasetFormatter:
                  path_to_save_normalization: str="/workspace/normalized_data/",
                  frequency: int=128, 
                  segment_time: int=180,
-                 use_3_class: bool=False,
+                 use_data_hour_before_epilepsy: bool=False,
                  time_stamp:int=10000):
         
         if os.path.exists(path_to_dataset) is False:
@@ -46,7 +46,7 @@ class DatasetFormatter:
         self.verbose = verbose
         self.frequency = frequency
         self.patients_data = []
-        self.use_3_class = use_3_class
+        self.use_data_hour_before_epilepsy = use_data_hour_before_epilepsy
         self.time_stamp = time_stamp
         
         for patient in self.folders_with_patients:
@@ -181,8 +181,23 @@ class DatasetFormatter:
                         no_hole_detected = False
                         continue 
                     parts.append(part)
-                    
-                if no_hole_detected:
+                
+                segment_end =  parts[0]['time'].iloc[len(parts[0])-1]
+                segment_start =  parts[0]['time'].iloc[0]
+                
+                label = 0
+                data_before_epilepsy = False
+                for j in range(len(labels_file)):
+                    if (segment_start < labels_file['labels.startTime'][j] + labels_file['labels.duration'][j] <= segment_end 
+                        or segment_start < labels_file['labels.startTime'][j] <= segment_end):
+                        label = 1
+                    if (segment_start < labels_file['labels.startTime'][j] - self.time_stamp <= segment_end and self.use_data_hour_before_epilepsy):
+                        data_before_epilepsy = True
+                        
+                if label == 1:
+                    data_before_epilepsy = False
+                
+                if no_hole_detected and not (self.use_data_hour_before_epilepsy and not data_before_epilepsy):
                     for i, part in enumerate(parts):
                         file_path = os.path.join(self.path_to_save, '_'.join([patient, sensors_signals_names[i], str(segment_index)]) + '.parquet')
                         mask = (label_df['Patient'] == patient) & (label_df['Segment'] == segment_index)
@@ -201,13 +216,6 @@ class DatasetFormatter:
                             #Label calculation/set
                             segment_end =  part['time'].iloc[len(part)-1]
                             segment_start =  part['time'].iloc[0]
-                            label = 0
-                            for j in range(len(labels_file)):
-                                if (segment_start < labels_file['labels.startTime'][j] + labels_file['labels.duration'][j] <= segment_end 
-                                    or segment_start < labels_file['labels.startTime'][j] <= segment_end):
-                                    label = 1
-                                elif (segment_start < labels_file['labels.startTime'][j] - self.time_stamp <= segment_end and self.use_3_class):
-                                    label = 2
 
                             new_row = pd.DataFrame([[patient, segment_index, label, file_path]], columns=columns)
                             label_df = pd.concat([label_df, pd.DataFrame(new_row)], ignore_index=True)
