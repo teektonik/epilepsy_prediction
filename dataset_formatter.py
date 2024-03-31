@@ -31,7 +31,9 @@ class DatasetFormatter:
                  path_to_save: str="/workspace/new_data/", 
                  path_to_save_normalization: str="/workspace/normalized_data/",
                  frequency: int=128, 
-                 segment_time: int=180):
+                 segment_time: int=180,
+                 use_3_class: bool=False,
+                 time_stamp:int=10000):
         
         if os.path.exists(path_to_dataset) is False:
             raise ValueError('There is no such path')
@@ -44,6 +46,8 @@ class DatasetFormatter:
         self.verbose = verbose
         self.frequency = frequency
         self.patients_data = []
+        self.use_3_class = use_3_class
+        self.time_stamp = time_stamp
         
         for patient in self.folders_with_patients:
             self.patients_data.append(os.listdir(os.path.join(self.path + patient)))
@@ -202,6 +206,8 @@ class DatasetFormatter:
                                 if (segment_start < labels_file['labels.startTime'][j] + labels_file['labels.duration'][j] <= segment_end 
                                     or segment_start < labels_file['labels.startTime'][j] <= segment_end):
                                     label = 1
+                                elif (segment_start < labels_file['labels.startTime'][j] - self.time_stamp <= segment_end and self.use_3_class):
+                                    label = 2
 
                             new_row = pd.DataFrame([[patient, segment_index, label, file_path]], columns=columns)
                             label_df = pd.concat([label_df, pd.DataFrame(new_row)], ignore_index=True)
