@@ -29,7 +29,14 @@ class LSTMDetector(L.LightningModule):
         self.criterion = nn.CrossEntropyLoss()
         self.f1_score = torchmetrics.F1Score(task="binary", num_classes=2)
         self.recall = torchmetrics.Recall(task="binary", num_classes=2)
+<<<<<<< HEAD
         self.precision = torchmetrics.classification.Precision(task='binary', num_classes=2)
+        
+    def forward(self, x):
+=======
+        self.precision = torchmetrics.classification.Precision(
+            task="binary", num_classes=2
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -41,7 +48,7 @@ class LSTMDetector(L.LightningModule):
         Returns:
         - torch.Tensor: Output tensor.
         """
-        
+>>>>>>> main
         lstm_out, _ = self.rnn(x)
         lstm_out = lstm_out[:, -1, :]
         output = self.fc2(self.relu(self.fc(lstm_out)))

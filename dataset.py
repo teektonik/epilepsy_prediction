@@ -14,7 +14,6 @@ from torch.utils.data import Dataset
 
 from model_arguments import ModelArguments
 
-
 class BaseDataset(Dataset):
     """
     A base class containing common code for others
@@ -74,7 +73,7 @@ class BaseDataset(Dataset):
         - int: Number of samples.
         """
         return len(self._annotation_file)
-    
+
     @staticmethod
     def _signal_normalization(signal):
         """
@@ -110,7 +109,7 @@ class BaseDataset(Dataset):
         noise = np.random.normal(0, abs(median_val), len(signal))
         noise_signal = signal + noise
         return noise_signal
-      
+
     def __getitem__(self, idx: int) -> tuple:
         """
         Gets the data for a given index.
@@ -139,6 +138,7 @@ class BaseDataset(Dataset):
         signals = [x['data'] / float(10 ** 9) for x in files]
         time = [x['time'] for x in files]
         
+
         if self.args.normalization_trigger:
             signals = [EpilepsyDataset._signal_normalization(signal) for signal in signals]
             
@@ -148,6 +148,27 @@ class BaseDataset(Dataset):
             
         signals = [signal.astype(np.float32) for signal in signals]
         return signals, time, label
+
+    @staticmethod
+    def _normalize_list_of_arrays(list_of_arrays: list[np.array]) -> list[np.array]:
+        """
+        Normalize a list of arrays.
+
+        Parameters:
+        - list_of_arrays (list[np.array]): List of arrays to normalize.
+
+        Returns:
+        - list[np.array]: List of normalized arrays.
+        """
+
+        def normalize_array(array):
+            array_min = np.min(array)
+            array_max = np.max(array)
+            normalized_array = (array - array_min) / (array_max - array_min)
+            return normalized_array
+
+        normalized_list = [normalize_array(array) for array in list_of_arrays]
+        return normalized_list
 
 class RawEpilepsyDataset(BaseDataset):
     """
@@ -248,7 +269,7 @@ class RawEpilepsyDataset(BaseDataset):
         matrix = np.vstack([magnitude, phase])
 
         return matrix
-
+    
     def __getitem__(self, idx: int) -> tuple:
         """
         Gets the data for a given index.
@@ -268,17 +289,18 @@ class RawEpilepsyDataset(BaseDataset):
             dtype=torch.float32,
         ).reshape(1, signal_length)
         
-        
-#         powers = torch.tensor(
-#             np.array([RawEpilepsyDataset._get_signal_power(x) for x in signals]),
-#             dtype=torch.float32,
-#         ).view(len(self._signals_names), signal_length)
+        '''
+        powers = torch.tensor(
+            np.array([RawEpilepsyDataset._get_signal_power(x) for x in signals]),
+            dtype=torch.float32,
+        ).view(len(self._signals_names), signal_length)
+        '''
 
         spectrums = torch.tensor(
             np.array([self._get_spectrum(signal) for signal in signals]), 
             dtype=torch.float32
         ).view(-1, signal_length)
-        
+    
         if self.args._use_spectrum:
             concatenated_signals = torch.tensor(
                 np.concatenate([signals, encoded_hours, spectrums], axis=0)
@@ -288,10 +310,12 @@ class RawEpilepsyDataset(BaseDataset):
                 np.concatenate([signals, encoded_hours], axis=0)
             ).view(self._number_of_features, signal_length)
 
+
         item = torch.transpose(concatenated_signals, 0, 1)
 
         return item, label
     
+
 class EpilepsyDataset(BaseDataset):
     """
     Dataset class for handling epileptic data with extracted features.
@@ -394,7 +418,7 @@ class EpilepsyDataset(BaseDataset):
         ).reshape(1, number_of_windows)
 
         return encoded_hours
-    
+
     @staticmethod
     def _compute_zero_crossing_rate(signals):
         """
