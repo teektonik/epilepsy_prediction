@@ -4,10 +4,10 @@ import os
 import numpy as np
 
 def files(dataframe, idx: int):
-     """
-     Function to process files based on the given index
-     Extracting necessary data from the dataframe
-     """
+    """
+    Function to process files based on the given index
+    Extracting necessary data from the dataframe
+    """
     data_row = dataframe.iloc[idx]
     path_to_data = '/workspace/new_data/'
     patient_name = data_row['Patient']
@@ -16,7 +16,7 @@ def files(dataframe, idx: int):
     # Constructing paths to segments based on patient name, signal, and segment ID
     paths_to_segments = [
         "_".join(
-            [os.path.join(path_to_data, patient_name), signal, segment_id]
+        [os.path.join(path_to_data, patient_name), signal, segment_id]
         ) + ".parquet"
         for signal in signals_names
     ]
@@ -26,7 +26,7 @@ def files(dataframe, idx: int):
     start_time = [file.loc[0, 'time'] for file in files]
     len_of_files = [len(file['time']) for file in files]
     end_of_files = [file.loc[len(file['time'])-1, 'time'] for file in files]
-        
+
     return start_time, len_of_files, end_of_files
     
 def test_files():
