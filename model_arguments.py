@@ -11,6 +11,9 @@ class ModelArguments:
                  sample_rate: int=128,
                  use_raw_data: bool=False,
                  number_of_extracting_features: int=3,
+                 use_normalization: bool=True,
+                 use_noise_augmentation: bool=True,
+                 noise_chance_augmentation: float=0.5
                 ):
         """
         Initializes the ModelsArguments with the given parameters.
@@ -29,7 +32,10 @@ class ModelArguments:
         self._window_size = window_size
         self._sample_rate = sample_rate
         self._use_raw_data = use_raw_data
+        self.use_normalization = use_normalization
+        self.use_noise_augmentation = use_noise_augmentation 
         self._number_of_extracting_features = number_of_extracting_features
+        self.noise_chance_augmentation = noise_chance_augmentation
         
     @property    
     def path_to_data(self) -> str:
@@ -147,7 +153,7 @@ class ModelArguments:
         Returns:
         - int: Total number of channels.
         """
-        number_of_channels = len(self.signals_names) * 2 \
+        number_of_channels = len(self.signals_names) * 3 \
                 if self.use_spectrum else len(self.signals_names)
         
         if self.use_raw_data is False:

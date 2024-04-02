@@ -139,10 +139,10 @@ class BaseDataset(Dataset):
         time = [x['time'] for x in files]
         
 
-        if self.args.normalization_trigger:
+        if self.args.use_normalization:
             signals = [EpilepsyDataset._signal_normalization(signal) for signal in signals]
             
-        if self.args.noise_augmentation_trigger:
+        if self.args.use_noise_augmentation:
             signals = [EpilepsyDataset._signal_noise_augmentation(signal) if np.random.rand() < self.args.noise_chance_augmentation else signal
                        for signal in signals]
             

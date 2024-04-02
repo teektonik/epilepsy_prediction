@@ -27,12 +27,12 @@ class LSTMDetector(L.LightningModule):
         self.relu = nn.ReLU()
 
         self.criterion = nn.CrossEntropyLoss()
-        
+        1
         if num_classes == 2:
             self.f1_score = torchmetrics.F1Score(task="binary", num_classes=num_classes)
             self.recall = torchmetrics.Recall(task="binary", num_classes=num_classes)
             self.precision = torchmetrics.classification.Precision(task='binary', num_classes=num_classes)
-        else
+        else:
             self.f1_score = torchmetrics.F1Score(task="multiclass", num_classes=num_classes)
             self.recall = torchmetrics.Recall(task="multiclass", num_classes=num_classes)
             self.precision = torchmetrics.classification.Precision(task="multiclass", num_classes=num_classes)
