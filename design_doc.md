@@ -1,59 +1,57 @@
-# Предсказание эпилептических приступов
+# Predicting epileptic seizures
 
 
-> ## Термины и пояснения
-> - EDA - электродермальная активность,  относится к изменению электропроводности кожи в ответ на выделение пота. EDA связан с регулированием нашей внутренней температуры и с эмоциональным возбуждением.
-> - BVP - пульсовой объем крови. Количество крови, протекающей через данный отрезок артерии в течение каждого пульсового периода.
-> - HRV - вариабельность сердечного ритма. Это показатель, который отражает неравномерность сердцебиения человека.
-> - акселерометр - прибор для измерения ускорения, который работает как датчик изменения положения устройства в пространстве.
-> - SQI - оценка качества сигнала, отображающий качество принимаемого сигнала в коэффициенте от 0 до 100, где 0 – очень плохое качество сигнала, тоесть сигнал практически отсутствует и 100 – максимально качественный сигнал.
+> ## Terms & Explanations
+> - EDA - electrodermal activity, refers to changes in the electrical conductivity of the skin in response to sweat secretion. EDA is related to the regulation of our internal temperature and to emotional arousal.
+> - BVP - pulse blood volume. The amount of blood flowing through a given segment of artery during each pulse period.
+> - HRV - heart rate variability. This is an index that reflects the irregularity of a person's heartbeat.
+> - Accelerometer - an acceleration measurement device that acts as a sensor for changes in the device's position in space.
+> - SQI - Signal Quality Index, which displays the quality of the received signal in a coefficient from 0 to 100, where 0 - very poor signal quality, i.e. there is practically no signal and 100 - maximum quality signal.
 
 
 
 
-## 1. Цели и предпосылки
-### 1.1. Зачем идем в разработку продукта? 
+## 1. Objectives & Prerequisites
+### 1.1. Why go into ML system development?  
 
-- Разработка этого продукта поможет не только людям, страдающим эпилепсией, но и их близким и окружающим. 
-- Успехом разработки будем считать, если точность предсказания будет достигать 90% процентов. (+-)
-- Нашим продуктом могут пользоваться (органы здравоохранения???? эпилептики??? в целом все, кому надо??)
+- The development of this product will help not only people with epilepsy, but also their loved ones and those around them. 
+- We will consider the development a success if the accuracy of the prediction reaches 90% percent.
+- This product can be used by anyone who wants to use it. 
 
-### 1.2. Предпосылки решения
+### 1.2. Decision prerequisites
 
-В повседневной жизни больной нуждается в наблюдении и подвергается риску быть застигнутым врасплох приступом. 
-Исходя из этих соображений появляется необходимость продукта, способного предсказать приступ и позволить вовремя принять необходимые лекарства, блокирующие приступ.
+The patient must be monitored in daily life, otherwise there is a risk that an attack will take him or her by accident. 
 
-## 2. Методология    
+Based on these considerations there is a need for a product capable of predicting a seizure and enabling the timely use of the necessary medication to block an epileptic seizure.
 
-### 2.1. Постановка задачи 
+## 2. Methodology    
 
-Наша цель заключается в разработке ML-системы, которая сможет уведомлять о приступе заблаговременно до его начала. Если человек, склонный к эпилепсии, будет пользоваться нашим продуктом, это значительно улучшит качество его жизни и обеспечит безопасность. 
+### 2.1. Problem statement 
 
-Трудность задачи в выявлении аномалий. Пульс человека значительно ускоряется во время физической активности или эмоционального возбуждения. Нам необходимо научить модель не реагировать в подобных ситуациях, но в то же время не пропускать приближение эпилептического припадка.
+Our goal is to develop an ML system that can notify a seizure well in advance of its onset. 
 
-### 2.2 Блок-схема решения
+The difficulty of the task is in detecting anomalies. A person's heart rate accelerates significantly during physical activity or emotional arousal. We need to teach the model not to react in such situations, but at the same time not to miss the approach of an epileptic seizure.
 
-### 2.3 Этапы решения задачи
-> Этапы:
-> - Этап 1 - получение датасета
-> - Этап 2 - подготовка данных
-> - Этап 3 - подготовка прогнозных моделей
-> - Этап 4 - интерпретация моделей
+### 2.2 Stages of problem solving
+> Stages:
+> - Stage 1 - obtaining the dataset
+> - Stage 2 - data preparation
+> - Stage 3 - preparation of predictive models
+> - Stage 4 - interpretation of models
 
-*Этап 1*
+*Stage 1*
   
-| Название данных  | Есть ли данные в компании (если да, название источника/витрин) | Требуемый ресурс для получения данных | Проверено ли качество данных|
+| Name of data  | Source | Resource required to retrieve data | Whether data quality has been verified|
 | ------------- | ------------- | ------------- | ------------- |
-| Seizure Gauge data | Dr Levin Kuhlman|  | + |
+| Seizure Gauge data | Dr. Levin Kuhlman|  | + |
 
-*Этап 2*
+*Stage 2*
 
-- __Препроцессинг__. В датасете нам даны пациенты и записи их сигналов: акселерометр, BVP, EDA. Эти сигналы мы объединяем в один, потом сегментируем их так, чтобы индексы сегментов совпадали началом и концом по времени. Эти сегменты мы сохраняем в папку new_data. Также создаём файл labels.csv, чтобы хранить в нём лейблы этих сегментам.
+- __Preprocessing__. In the dataset we are given patients and records of their signals: accelerometer, BVP, EDA. We combine these signals into one, then segment them so that the segment indexes coincide with the beginning and end in time.
 
-- __Нормализация__. Сегменты мы аугментируем, чтобы уменьшить дисбаланс классов. Для этого мы добавляем шум к сегментам, где есть эпилепсия, и сохраняем в папку normalized_data. Добавляем соответствующие лейблы в папку label_csv. Далее балансируем классы, избавляясь от сегментов, где нет эпилепсии, чтобы количество сегментов одного класса совпадало с количеством сегментов другого класса.
+- __Normalization__. We augment the segments to reduce class imbalance. To do this, we add noise to segments with epilepsy. Next, we balance the classes by getting rid of segments with no epilepsy so that the number of segments in one class matches the number of segments in the other class.
 
-- __Подача в модель__. На этом этапе мы конкатенируем матрицу сигналов так, чтобы каждый столбец являлся одним сигналом. К получившейся матрице мы добавляем спектры этих сигналов в таком же виде: столбец - спектр, и в конец добавляем время. Наконец, эти матрицы мы подаём в модель для обучения.
+- __Submission to the model__. In this step, we add the spectra of these signals and time to the signal matrix. 
+Finally, we feed these matrices into the model for training.
 
-*Этап 3*
-
-На данный момент идёт обучение LSTM, 
+*Stage 3*
