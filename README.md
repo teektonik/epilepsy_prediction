@@ -25,6 +25,7 @@ The data were fed into the model in the matrix form. The description of the mode
 
 ## Model
 
+![model (2)](https://github.com/teektonik/epilepsy_prediction/assets/124969658/b55a39bb-ee49-4ab2-9505-ab83a81b773c)
 
 ## Result
 At the moment our metrics are as follows: 
