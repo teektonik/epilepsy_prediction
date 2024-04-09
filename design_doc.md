@@ -36,8 +36,7 @@ The difficulty of the task is in detecting anomalies. A person's heart rate acce
 > Stages:
 > - Stage 1 - obtaining the dataset
 > - Stage 2 - data preparation
-> - Stage 3 - preparation of predictive models
-> - Stage 4 - interpretation of models
+> - Stage 3 - interpretation of models
 
 *Stage 1*
   
@@ -55,3 +54,5 @@ The difficulty of the task is in detecting anomalies. A person's heart rate acce
 Finally, we feed these matrices into the model for training.
 
 *Stage 3*
+
+![model](https://github.com/teektonik/epilepsy_prediction/assets/124969658/c2e3abb7-ff72-4fb7-be59-8e8e82c90a51)
