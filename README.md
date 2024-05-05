@@ -43,5 +43,4 @@ The detector sees epilepsy approaching 1.5 minutes before it.
 - https://www.mdpi.com/1424-8220/20/14/3987
 - https://docs.google.com/document/d/1WT7cLyEdiOB7QBlFqqbUXw76QE7c_YodZjdcHI40EDg/edit#heading=h.34lbw897k512
 - https://cyberleninka.ru/article/n/vliyanie-epilepticheskih-pristupov-na-serdechnyy-ritm-i-provodimost-literaturnyy-obzor/viewer
-- https://trello.com/c/iKhRQhfm/13-%D1%80%D0%B0%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D1%82%D1%8C%D1%81%D1%8F-%D1%81-%D0%B0%D0%BA%D1%81%D0%B5%D0%BB%D0%B5%D1%80%D0%BE%D0%BC%D0%B5%D1%82%D1%80%D0%BE%D0%BC
 - https://imotions.com/blog/learning/research-fundamentals/eda/
