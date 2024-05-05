@@ -5,7 +5,7 @@
 * [Fedor Tikunov](https://github.com/FedorTikunov) `dev`
 * [Antonina Testova](https://github.com/teektonik) `QA`
 ## Problem
-Each year, about 5 million people worldwide are diagnosed with epilepsy. Epilepsy is a brain disorder that causes recurrent seizures. Epilepsy usually causes seizures, but some people have other symptoms, such as confusion and staring off into space, etc.
+Each year, about 5 million people worldwide are diagnosed with epilepsy, according to the World Health Organization. Epilepsy is a brain disorder that causes recurrent seizures. Epilepsy usually causes seizures, but some people have other symptoms, such as confusion and staring off into space, etc.
 
 ## Decision
 As a rule, epileptic seizures come unexpectedly, which can be fatal. Our goal is to develop an ML system that will predict a seizure before it starts. 
@@ -34,3 +34,14 @@ At the moment our metrics are as follows:
 - F1 - 94%. 
 
 The detector sees epilepsy approaching 1.5 minutes before it.
+
+## Sources
+
+- https://www.who.int/ru/news-room/fact-sheets/detail/epilepsy
+- https://www.nature.com/articles/s41598-021-01449-2#Tab2
+- https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9736525/
+- https://www.mdpi.com/1424-8220/20/14/3987
+- https://docs.google.com/document/d/1WT7cLyEdiOB7QBlFqqbUXw76QE7c_YodZjdcHI40EDg/edit#heading=h.34lbw897k512
+- https://cyberleninka.ru/article/n/vliyanie-epilepticheskih-pristupov-na-serdechnyy-ritm-i-provodimost-literaturnyy-obzor/viewer
+- https://trello.com/c/iKhRQhfm/13-%D1%80%D0%B0%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D1%82%D1%8C%D1%81%D1%8F-%D1%81-%D0%B0%D0%BA%D1%81%D0%B5%D0%BB%D0%B5%D1%80%D0%BE%D0%BC%D0%B5%D1%82%D1%80%D0%BE%D0%BC
+- https://imotions.com/blog/learning/research-fundamentals/eda/
